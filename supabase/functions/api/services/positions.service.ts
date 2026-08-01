@@ -7,9 +7,7 @@ export type SportPosition = {
   name: string;
 };
 
-export async function listPositionsByOrgId(
-  org_id: string,
-): Promise<{ data: SportPosition[]; error: unknown }> {
+export async function listPositionsByOrgId(org_id: string): Promise<{ data: SportPosition[]; error: unknown }> {
   const client = sbAdmin;
   if (!client) {
     return { data: [], error: new Error("Supabase client not initialized") };

@@ -11,14 +11,7 @@ import {
   listGuardians,
   updateGuardian,
 } from "../services/guardians.service.ts";
-import {
-  badRequest,
-  created,
-  internalError,
-  json,
-  methodNotAllowed,
-  notFound,
-} from "../utils/http.ts";
+import { badRequest, created, internalError, json, methodNotAllowed, notFound } from "../utils/http.ts";
 import type { RequestContext } from "../routes/router.ts";
 import { RE_UUID } from "../utils/uuid.ts";
 

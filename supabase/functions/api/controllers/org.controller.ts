@@ -98,10 +98,7 @@ export async function handleOrgSignup(req: Request, origin: string | null) {
 
       if (sportUpdateErr) {
         await sbAdmin!.auth.admin.deleteUser(userId).catch(() => {});
-        return serverError(
-          `Signup failed: ${sportUpdateErr.message}`,
-          origin,
-        );
+        return serverError(`Signup failed: ${sportUpdateErr.message}`, origin);
       }
     }
   }
@@ -112,7 +109,11 @@ export async function handleOrgSignup(req: Request, origin: string | null) {
   }
 
   const result = rpcData[0];
-  return json({ ok: true, userId, orgId: result.org_id, profileId: result.profile_id, teamIds: result.team_ids ?? [] }, origin, 201);
+  return json(
+    { ok: true, userId, orgId: result.org_id, profileId: result.profile_id, teamIds: result.team_ids ?? [] },
+    origin,
+    201,
+  );
 }
 
 function readOptionalString(body: Record<string, unknown>, key: string): string | null | undefined {
@@ -157,7 +158,7 @@ function parseListOrganizationsFilters(url: URL): { value?: ListOrganizationsFil
   return {
     value: {
       q: q || undefined,
-      program_gender: programGender ? programGender as ListOrganizationsFilters["program_gender"] : undefined,
+      program_gender: programGender ? (programGender as ListOrganizationsFilters["program_gender"]) : undefined,
       sport_id: sportId || undefined,
       limit: parseLimit(url.searchParams.get("limit"), 50, 100),
       offset: parseOffset(url.searchParams.get("offset")),
@@ -202,7 +203,8 @@ function parseUpdateOrganization(body: unknown): { value?: UpdateOrganizationInp
 
   const maxBelow = readOptionalInteger(obj, "maxBelowThresholdRatingsAllowed");
   if ("maxBelowThresholdRatingsAllowed" in obj) {
-    if (maxBelow === undefined) return { error: "maxBelowThresholdRatingsAllowed must be a non-negative integer or null" };
+    if (maxBelow === undefined)
+      return { error: "maxBelowThresholdRatingsAllowed must be a non-negative integer or null" };
     input.maxBelowThresholdRatingsAllowed = maxBelow;
   }
 

@@ -2,7 +2,11 @@ import { z } from "https://esm.sh/zod@3.23.8";
 import { RE_UUID } from "../utils/uuid.ts";
 
 const uuid = () => z.string().regex(RE_UUID, "Invalid UUID");
-const sha256Hex = () => z.string().trim().regex(/^[a-f0-9]{64}$/i, "file_hash must be a SHA-256 hex digest");
+const sha256Hex = () =>
+  z
+    .string()
+    .trim()
+    .regex(/^[a-f0-9]{64}$/i, "file_hash must be a SHA-256 hex digest");
 
 export const CreateSkillSchema = z.object({
   org_id: uuid(),
@@ -41,21 +45,23 @@ export const SkillMediaUploadSchema = z.object({
   position: z.number({ coerce: true }).int().min(0).optional().nullable(),
 });
 
-export const SkillMediaCreateSchema = z.object({
-  org_id: uuid(),
-  skill_id: uuid(),
-  bucket: z.string().trim().min(1).max(200).optional(),
-  object_path: z.string().trim().min(1).max(1024).optional(),
-  storage_path: z.string().trim().min(1).max(1024).optional().nullable(),
-  url: z.string().url("url must be a valid URL").optional(),
-  media_type: z.string().trim().max(50).optional().nullable(),
-  title: z.string().trim().max(200).optional().nullable(),
-  description: z.string().trim().max(4000).optional().nullable(),
-  thumbnail_url: z.string().url("thumbnail_url must be a valid URL").optional().nullable(),
-  position: z.number({ coerce: true }).int().min(0).optional().nullable(),
-}).refine((data) => Boolean(data.object_path || data.storage_path || data.url), {
-  message: "object_path or url is required",
-});
+export const SkillMediaCreateSchema = z
+  .object({
+    org_id: uuid(),
+    skill_id: uuid(),
+    bucket: z.string().trim().min(1).max(200).optional(),
+    object_path: z.string().trim().min(1).max(1024).optional(),
+    storage_path: z.string().trim().min(1).max(1024).optional().nullable(),
+    url: z.string().url("url must be a valid URL").optional(),
+    media_type: z.string().trim().max(50).optional().nullable(),
+    title: z.string().trim().max(200).optional().nullable(),
+    description: z.string().trim().max(4000).optional().nullable(),
+    thumbnail_url: z.string().url("thumbnail_url must be a valid URL").optional().nullable(),
+    position: z.number({ coerce: true }).int().min(0).optional().nullable(),
+  })
+  .refine((data) => Boolean(data.object_path || data.storage_path || data.url), {
+    message: "object_path or url is required",
+  });
 
 export type SkillMediaUploadInput = z.infer<typeof SkillMediaUploadSchema>;
 export type SkillMediaCreateInput = z.infer<typeof SkillMediaCreateSchema>;
@@ -69,26 +75,28 @@ export const SkillMediaBatchItemSchema = z.object({
   position: z.number({ coerce: true }).int().min(0).optional().nullable(),
 });
 
-export const SkillMediaBatchSchema = z.object({
-  org_id: uuid(),
-  items: z.array(SkillMediaBatchItemSchema).min(1, "items must contain at least one entry").max(100),
-}).superRefine((data, ctx) => {
-  const seenFields = new Set<string>();
+export const SkillMediaBatchSchema = z
+  .object({
+    org_id: uuid(),
+    items: z.array(SkillMediaBatchItemSchema).min(1, "items must contain at least one entry").max(100),
+  })
+  .superRefine((data, ctx) => {
+    const seenFields = new Set<string>();
 
-  for (const [index, item] of data.items.entries()) {
-    const field = item.file_field.trim();
-    if (seenFields.has(field)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["items", index, "file_field"],
-        message: `Duplicate file_field '${field}'`,
-      });
-      continue;
+    for (const [index, item] of data.items.entries()) {
+      const field = item.file_field.trim();
+      if (seenFields.has(field)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["items", index, "file_field"],
+          message: `Duplicate file_field '${field}'`,
+        });
+        continue;
+      }
+
+      seenFields.add(field);
     }
-
-    seenFields.add(field);
-  }
-});
+  });
 
 export type SkillMediaBatchItemInput = z.infer<typeof SkillMediaBatchItemSchema>;
 export type SkillMediaBatchInput = z.infer<typeof SkillMediaBatchSchema>;

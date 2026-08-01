@@ -8,55 +8,60 @@ const DrillMappingSchema = z.object({
   level: z.number({ coerce: true }).int().optional().nullable(),
 });
 
-export const CreateSkillDrillMapSchema = z.object({
-  org_id: uuid(),
-  skill_id: uuid(),
-  drill_id: uuid().optional(),
-  drill_ids: z.array(uuid()).optional(),
-  drills: z.array(DrillMappingSchema).optional(),
-  level: z.number({ coerce: true }).int().optional().nullable(),
-}).superRefine((data, ctx) => {
-  const sources = [
-    data.drill_id ? 1 : 0,
-    data.drill_ids?.length ? 1 : 0,
-    data.drills?.length ? 1 : 0,
-  ].reduce((sum, value) => sum + value, 0);
+export const CreateSkillDrillMapSchema = z
+  .object({
+    org_id: uuid(),
+    skill_id: uuid(),
+    drill_id: uuid().optional(),
+    drill_ids: z.array(uuid()).optional(),
+    drills: z.array(DrillMappingSchema).optional(),
+    level: z.number({ coerce: true }).int().optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    const sources = [data.drill_id ? 1 : 0, data.drill_ids?.length ? 1 : 0, data.drills?.length ? 1 : 0].reduce(
+      (sum, value) => sum + value,
+      0,
+    );
 
-  if (sources !== 1) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["drill_id"],
-      message: "Provide exactly one of drill_id, drill_ids, or drills",
-    });
-  }
-});
+    if (sources !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["drill_id"],
+        message: "Provide exactly one of drill_id, drill_ids, or drills",
+      });
+    }
+  });
 
-export const UpdateSkillDrillMapSchema = z.object({
-  level: z.number({ coerce: true }).int().optional().nullable(),
-}).refine((data) => Object.prototype.hasOwnProperty.call(data, "level"), {
-  message: "level is required",
-  path: ["level"],
-});
+export const UpdateSkillDrillMapSchema = z
+  .object({
+    level: z.number({ coerce: true }).int().optional().nullable(),
+  })
+  .refine((data) => Object.prototype.hasOwnProperty.call(data, "level"), {
+    message: "level is required",
+    path: ["level"],
+  });
 
-export const BulkSkillDrillMapSchema = z.object({
-  org_id: uuid(),
-  skill_id: uuid(),
-  add_drill_ids: z.array(uuid()).optional().default([]),
-  add_drills: z.array(DrillMappingSchema).optional().default([]),
-  remove_drill_ids: z.array(uuid()).optional().default([]),
-  level: z.number({ coerce: true }).int().optional().nullable(),
-}).superRefine((data, ctx) => {
-  const hasAdds = data.add_drill_ids.length > 0 || data.add_drills.length > 0;
-  const hasRemoves = data.remove_drill_ids.length > 0;
+export const BulkSkillDrillMapSchema = z
+  .object({
+    org_id: uuid(),
+    skill_id: uuid(),
+    add_drill_ids: z.array(uuid()).optional().default([]),
+    add_drills: z.array(DrillMappingSchema).optional().default([]),
+    remove_drill_ids: z.array(uuid()).optional().default([]),
+    level: z.number({ coerce: true }).int().optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    const hasAdds = data.add_drill_ids.length > 0 || data.add_drills.length > 0;
+    const hasRemoves = data.remove_drill_ids.length > 0;
 
-  if (!hasAdds && !hasRemoves) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["add_drill_ids"],
-      message: "Provide at least one add_drill_ids, add_drills, or remove_drill_ids entry",
-    });
-  }
-});
+    if (!hasAdds && !hasRemoves) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["add_drill_ids"],
+        message: "Provide at least one add_drill_ids, add_drills, or remove_drill_ids entry",
+      });
+    }
+  });
 
 export const SkillDrillMapListSchema = z.object({
   org_id: uuid(),
@@ -74,18 +79,14 @@ export type CreateSkillDrillMapInput = z.infer<typeof CreateSkillDrillMapSchema>
 export type BulkSkillDrillMapInput = z.infer<typeof BulkSkillDrillMapSchema>;
 export type UpdateSkillDrillMapInput = z.infer<typeof UpdateSkillDrillMapSchema>;
 export type SkillDrillMapListInput = z.infer<typeof SkillDrillMapListSchema>;
-export type SkillDrillMapBySkillListInput = z.infer<
-  typeof SkillDrillMapBySkillListSchema
->;
+export type SkillDrillMapBySkillListInput = z.infer<typeof SkillDrillMapBySkillListSchema>;
 
 export type SkillDrillMapCreateItem = {
   drill_id: string;
   level: number | null;
 };
 
-export function normalizeSkillDrillMapCreate(
-  input: CreateSkillDrillMapInput,
-): SkillDrillMapCreateItem[] {
+export function normalizeSkillDrillMapCreate(input: CreateSkillDrillMapInput): SkillDrillMapCreateItem[] {
   if (input.drills?.length) {
     return input.drills.map((item) => ({
       drill_id: item.drill_id,
@@ -100,15 +101,15 @@ export function normalizeSkillDrillMapCreate(
     }));
   }
 
-  return [{
-    drill_id: input.drill_id!,
-    level: input.level ?? null,
-  }];
+  return [
+    {
+      drill_id: input.drill_id!,
+      level: input.level ?? null,
+    },
+  ];
 }
 
-export function normalizeSkillDrillMapBulkCreate(
-  input: BulkSkillDrillMapInput,
-): SkillDrillMapCreateItem[] {
+export function normalizeSkillDrillMapBulkCreate(input: BulkSkillDrillMapInput): SkillDrillMapCreateItem[] {
   const byDrillId = new Map<string, SkillDrillMapCreateItem>();
 
   for (const drill_id of input.add_drill_ids) {

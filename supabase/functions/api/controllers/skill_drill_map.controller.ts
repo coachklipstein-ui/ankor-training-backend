@@ -15,14 +15,7 @@ import {
   listSkillDrillMapsBySkill,
   updateSkillDrillMap,
 } from "../services/skill_drill_map.service.ts";
-import {
-  badRequest,
-  created,
-  internalError,
-  json,
-  methodNotAllowed,
-  notFound,
-} from "../utils/http.ts";
+import { badRequest, created, internalError, json, methodNotAllowed, notFound } from "../utils/http.ts";
 import type { RequestContext } from "../routes/router.ts";
 import { RE_UUID } from "../utils/uuid.ts";
 
@@ -144,7 +137,12 @@ export async function createSkillDrillMapsController(
   }
 
   const items = normalizeSkillDrillMapCreate(parsed.data);
-  const { data, error, notFound: missing, conflict } = await createSkillDrillMaps({
+  const {
+    data,
+    error,
+    notFound: missing,
+    conflict,
+  } = await createSkillDrillMaps({
     org_id: parsed.data.org_id,
     skill_id: parsed.data.skill_id,
     items,
@@ -187,7 +185,11 @@ export async function bulkSkillDrillMapsController(
   }
 
   const addItems = normalizeSkillDrillMapBulkCreate(parsed.data);
-  const { data, error, notFound: missing } = await bulkChangeSkillDrillMaps({
+  const {
+    data,
+    error,
+    notFound: missing,
+  } = await bulkChangeSkillDrillMaps({
     org_id: parsed.data.org_id,
     skill_id: parsed.data.skill_id,
     addItems,
@@ -234,7 +236,11 @@ export async function updateSkillDrillMapController(
     return badRequest(validationMessage(parsed.error));
   }
 
-  const { data, error, notFound: missing } = await updateSkillDrillMap({
+  const {
+    data,
+    error,
+    notFound: missing,
+  } = await updateSkillDrillMap({
     skill_id,
     drill_id,
     level: parsed.data.level ?? null,
@@ -272,7 +278,11 @@ export async function deleteSkillDrillMapController(
     return badRequest("org_id (UUID) is required");
   }
 
-  const { data, error, notFound: missing } = await deleteSkillDrillMap({
+  const {
+    data,
+    error,
+    notFound: missing,
+  } = await deleteSkillDrillMap({
     org_id,
     skill_id,
     drill_id,

@@ -3,10 +3,9 @@ import { RE_UUID } from "../utils/uuid.ts";
 
 const uuid = () => z.string().regex(RE_UUID, "Invalid UUID");
 
-const RelationshipSchema = z.enum(
-  ["mother", "father", "guardian", "step-parent", "grandparent", "sibling", "other"],
-  { required_error: "relationship is required" },
-);
+const RelationshipSchema = z.enum(["mother", "father", "guardian", "step-parent", "grandparent", "sibling", "other"], {
+  required_error: "relationship is required",
+});
 
 export const CreateGuardianSchema = z.object({
   org_id: uuid(),

@@ -62,17 +62,11 @@ export async function listOrganizations(filters: ListOrganizationsFilters): Prom
   return { data: (data ?? []) as OrganizationDto[], count: count ?? 0, error };
 }
 
-export async function getOrganizationById(
-  id: string,
-): Promise<{ data: OrganizationDto | null; error: unknown }> {
+export async function getOrganizationById(id: string): Promise<{ data: OrganizationDto | null; error: unknown }> {
   const client = sbAdmin;
   if (!client) return { data: null, error: new Error("Supabase admin client not configured") };
 
-  const { data, error } = await client
-    .from("organizations")
-    .select(ORG_SELECT)
-    .eq("id", id)
-    .maybeSingle();
+  const { data, error } = await client.from("organizations").select(ORG_SELECT).eq("id", id).maybeSingle();
 
   return { data: (data ?? null) as OrganizationDto | null, error };
 }

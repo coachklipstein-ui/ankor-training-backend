@@ -1,9 +1,7 @@
 import { z } from "https://esm.sh/zod@3.23.8";
 
-const uuid = () => z.string().regex(
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-  "Invalid UUID"
-);
+const uuid = () =>
+  z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i, "Invalid UUID");
 
 export const passwordSchema = z.string().min(8, "Password must be at least 8 characters");
 
@@ -65,7 +63,7 @@ export const CategoryInputSchema = z.object({
   subskills: z.array(SubskillInputSchema).nonempty(),
 });
 export const ScorecardTemplateCreateSchema = z.object({
-  createdBy: uuid().optional(),                         // required if no Bearer
+  createdBy: uuid().optional(), // required if no Bearer
   org_id: uuid(),
   sport_id: uuid().optional().nullable(),
   name: z.string().trim().min(1),

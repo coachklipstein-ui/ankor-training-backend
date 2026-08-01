@@ -2,22 +2,14 @@ import type { Middleware } from "../routes/router.ts";
 import { getPlanAccess, isPlanMember } from "../services/plans.service.ts";
 import { RE_UUID } from "./uuid.ts";
 import { badRequest, forbidden, internalError, notFound, unauthorized } from "./http.ts";
-import {
-  requireAdminOrSysAdmin,
-  requireOrgRole,
-  requireSysAdmin,
-  type OrgRole,
-} from "./auth.ts";
+import { requireAdminOrSysAdmin, requireOrgRole, requireSysAdmin, type OrgRole } from "./auth.ts";
 
 function getUserId(ctx: { user?: { id: string } }): string | Response {
   if (!ctx.user) return unauthorized("Unauthorized");
   return ctx.user.id;
 }
 
-export function orgRoleGuardFromQuery(
-  paramName: string,
-  allowedRoles: OrgRole[],
-): Middleware {
+export function orgRoleGuardFromQuery(paramName: string, allowedRoles: OrgRole[]): Middleware {
   return async (req, _origin, _params, ctx) => {
     const org_id = (new URL(req.url).searchParams.get(paramName) ?? "").trim();
     if (!RE_UUID.test(org_id)) {
@@ -60,7 +52,10 @@ export function orgRoleGuardFromBody(
   options: { allowNull?: boolean; optional?: boolean } = {},
 ): Middleware {
   return async (req, _origin, _params, ctx) => {
-    const raw = await req.clone().json().catch(() => null);
+    const raw = await req
+      .clone()
+      .json()
+      .catch(() => null);
     if (!raw || typeof raw !== "object") {
       return badRequest("Invalid JSON payload");
     }
@@ -86,11 +81,12 @@ export function orgRoleGuardFromBody(
   };
 }
 
-export function evaluationBulkOrgGuard(
-  allowedRoles: OrgRole[],
-): Middleware {
+export function evaluationBulkOrgGuard(allowedRoles: OrgRole[]): Middleware {
   return async (req, _origin, _params, ctx) => {
-    const raw = await req.clone().json().catch(() => null);
+    const raw = await req
+      .clone()
+      .json()
+      .catch(() => null);
     if (!raw || typeof raw !== "object") {
       return badRequest("Body must contain an 'evaluations' array.");
     }
@@ -128,10 +124,7 @@ export function evaluationBulkOrgGuard(
   };
 }
 
-export function userQueryGuard(
-  paramName: string,
-  options: { allowMissing?: boolean } = {},
-): Middleware {
+export function userQueryGuard(paramName: string, options: { allowMissing?: boolean } = {}): Middleware {
   return async (req, _origin, _params, ctx) => {
     const userIdParam = (new URL(req.url).searchParams.get(paramName) ?? "").trim();
     if (!userIdParam) {
@@ -224,7 +217,10 @@ export function planWriteGuard(): Middleware {
 
 export function planCreateGuard(): Middleware {
   return async (req, _origin, _params, ctx) => {
-    const raw = await req.clone().json().catch(() => null);
+    const raw = await req
+      .clone()
+      .json()
+      .catch(() => null);
     if (!raw || typeof raw !== "object") {
       return badRequest("Invalid JSON payload");
     }
@@ -248,4 +244,3 @@ export function planCreateGuard(): Middleware {
     return null;
   };
 }
-

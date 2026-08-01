@@ -21,10 +21,7 @@ export type SkillDrillMapRow = {
   created_at: string;
 };
 
-async function ensureSkillInOrg(
-  org_id: string,
-  skill_id: string,
-): Promise<{ ok: boolean; error: unknown }> {
+async function ensureSkillInOrg(org_id: string, skill_id: string): Promise<{ ok: boolean; error: unknown }> {
   const { data: skill, error: skillError } = await sbAdmin!
     .from("skills")
     .select("id")
@@ -43,20 +40,13 @@ async function ensureSkillInOrg(
   return { ok: true, error: null };
 }
 
-async function ensureDrillsInOrg(
-  org_id: string,
-  drillIds: string[],
-): Promise<{ ok: boolean; error: unknown }> {
+async function ensureDrillsInOrg(org_id: string, drillIds: string[]): Promise<{ ok: boolean; error: unknown }> {
   const uniqueIds = Array.from(new Set(drillIds));
   if (uniqueIds.length === 0) {
     return { ok: false, error: new Error("At least one drill is required") };
   }
 
-  const { data: drills, error } = await sbAdmin!
-    .from("drills")
-    .select("id")
-    .eq("org_id", org_id)
-    .in("id", uniqueIds);
+  const { data: drills, error } = await sbAdmin!.from("drills").select("id").eq("org_id", org_id).in("id", uniqueIds);
 
   if (error) {
     return { ok: false, error };
@@ -77,9 +67,7 @@ function isDuplicateKeyError(error: unknown): boolean {
   return code === "23505";
 }
 
-export async function listSkillDrillMaps(
-  input: SkillDrillMapListInput,
-): Promise<ServiceResult<unknown[]>> {
+export async function listSkillDrillMaps(input: SkillDrillMapListInput): Promise<ServiceResult<unknown[]>> {
   if (input.skill_id) {
     const result = await ensureSkillInOrg(input.org_id, input.skill_id);
     if (!result.ok) {
@@ -188,10 +176,12 @@ export async function bulkChangeSkillDrillMaps(args: {
   skill_id: string;
   addItems: SkillDrillMapCreateItem[];
   removeDrillIds: string[];
-}): Promise<ServiceResult<{
-  added: SkillDrillMapRow[];
-  removed: Array<{ skill_id: string; drill_id: string }>;
-}>> {
+}): Promise<
+  ServiceResult<{
+    added: SkillDrillMapRow[];
+    removed: Array<{ skill_id: string; drill_id: string }>;
+  }>
+> {
   const addDrillIds = args.addItems.map((item) => item.drill_id);
   const removeDrillIds = Array.from(new Set(args.removeDrillIds));
   const drillIds = Array.from(new Set([...addDrillIds, ...removeDrillIds]));

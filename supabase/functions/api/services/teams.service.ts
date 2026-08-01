@@ -1,11 +1,6 @@
 // src/services/teams.service.ts
 import { sbAdmin } from "./supabase.ts";
-import type {
-  CreateTeamInput,
-  TeamDTO,
-  UpdateTeamInput,
-} from "../dtos/team.dto.ts";
-
+import type { CreateTeamInput, TeamDTO, UpdateTeamInput } from "../dtos/team.dto.ts";
 
 export type TeamAthlete = {
   team_id: string;
@@ -28,7 +23,8 @@ export async function listTeamsWithAthletes(org_id: string): Promise<{
 }> {
   const { data, error } = await sbAdmin!
     .from("teams")
-    .select(`
+    .select(
+      `
       id,
       org_id,
       name,
@@ -40,7 +36,8 @@ export async function listTeamsWithAthletes(org_id: string): Promise<{
           last_name
         )
       )
-    `)
+    `,
+    )
     .eq("org_id", org_id)
     .order("created_at", { ascending: false });
 
@@ -111,10 +108,7 @@ export async function getTeamsByOrgId(orgId: string): Promise<TeamDTO[]> {
   return mapped;
 }
 
-export async function getTeamById(
-  team_id: string,
-  org_id: string,
-): Promise<{ data: TeamDTO | null; error: unknown }> {
+export async function getTeamById(team_id: string, org_id: string): Promise<{ data: TeamDTO | null; error: unknown }> {
   if (!sbAdmin) {
     return { data: null, error: new Error("Supabase client not initialized") };
   }
@@ -143,9 +137,7 @@ export async function getTeamById(
   };
 }
 
-export async function createTeam(
-  input: CreateTeamInput,
-): Promise<{ data: TeamDTO | null; error: unknown }> {
+export async function createTeam(input: CreateTeamInput): Promise<{ data: TeamDTO | null; error: unknown }> {
   if (!sbAdmin) {
     return { data: null, error: new Error("Supabase client not initialized") };
   }
@@ -229,12 +221,7 @@ export async function deleteTeam(
     return { data: null, error: new Error("Supabase client not initialized") };
   }
 
-  const { data, error } = await sbAdmin
-    .from("teams")
-    .delete()
-    .eq("id", team_id)
-    .eq("org_id", org_id)
-    .select("id");
+  const { data, error } = await sbAdmin.from("teams").delete().eq("id", team_id).eq("org_id", org_id).select("id");
 
   if (error) return { data: null, error };
   if (!data || data.length === 0) {
@@ -250,7 +237,8 @@ export async function getAthletesByTeam(
 ): Promise<{ data: TeamAthlete[] | null; error: unknown }> {
   const { data, error } = await sbAdmin!
     .from("team_athletes")
-    .select(`
+    .select(
+      `
       team_id,
       teams!inner(org_id),
       athlete:athletes!inner (
@@ -267,7 +255,8 @@ export async function getAthletesByTeam(
           position_id
         )
       )
-    `)
+    `,
+    )
     .eq("team_id", teamId)
     .eq("teams.org_id", org_id)
     .eq("status", "active");
@@ -279,7 +268,7 @@ export async function getAthletesByTeam(
   const positionIds = new Set<string>();
   for (const row of data ?? []) {
     const rawPos = (row as any)?.athlete?.athlete_positions;
-    const posRow = Array.isArray(rawPos) ? rawPos[0] ?? null : rawPos ?? null;
+    const posRow = Array.isArray(rawPos) ? (rawPos[0] ?? null) : (rawPos ?? null);
     const position_id = posRow?.position_id;
     if (typeof position_id === "string" && position_id.trim()) {
       positionIds.add(position_id.trim());
@@ -308,9 +297,9 @@ export async function getAthletesByTeam(
     const a = row.athlete ?? {};
 
     const rawPos = a.athlete_positions;
-    const posRow = Array.isArray(rawPos) ? rawPos[0] ?? null : rawPos ?? null;
+    const posRow = Array.isArray(rawPos) ? (rawPos[0] ?? null) : (rawPos ?? null);
     const position_id = posRow?.position_id ?? null;
-    const position = position_id ? positionsById.get(position_id) ?? null : null;
+    const position = position_id ? (positionsById.get(position_id) ?? null) : null;
 
     return {
       team_id: row.team_id,

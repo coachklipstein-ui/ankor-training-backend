@@ -4,6 +4,17 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "3.9.6",
     "supabase": "^2.54.10"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,json,html}": "prettier --write"
   }
 }

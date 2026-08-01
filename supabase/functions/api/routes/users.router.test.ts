@@ -17,12 +17,7 @@ Deno.test("users list route is registered before dynamic id route", () => {
 
 Deno.test("GET /users/list uses org list validation instead of id validation", async () => {
   const router = createUsersRouter();
-  const response = await router.handle(
-    "GET",
-    "list",
-    request("users/list?org_id=not-a-uuid"),
-    null,
-  );
+  const response = await router.handle("GET", "list", request("users/list?org_id=not-a-uuid"), null);
 
   assertEquals(response?.status, 400);
   assertEquals(await response?.json(), {

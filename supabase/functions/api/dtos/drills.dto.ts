@@ -16,10 +16,7 @@ export const DrillMediaSchema = z.object({
   url: z.string().url("media.url must be a valid URL"),
   title: z.string().trim().max(200).optional().nullable(),
   description: z.string().trim().max(4000).optional().nullable(),
-  thumbnail_url: z.string()
-    .url("thumbnail_url must be a valid URL")
-    .optional()
-    .nullable(),
+  thumbnail_url: z.string().url("thumbnail_url must be a valid URL").optional().nullable(),
   position: z.number({ coerce: true }).int().min(0).optional().nullable(),
 });
 
@@ -31,10 +28,7 @@ export const DrillMediaUploadSchema = z.object({
   type: DrillMediaTypeSchema.default("video"),
   title: z.string().trim().max(200).optional().nullable(),
   description: z.string().trim().max(4000).optional().nullable(),
-  thumbnail_url: z.string()
-    .url("thumbnail_url must be a valid URL")
-    .optional()
-    .nullable(),
+  thumbnail_url: z.string().url("thumbnail_url must be a valid URL").optional().nullable(),
   position: z.number({ coerce: true }).int().min(0).optional().nullable(),
 });
 
@@ -107,35 +101,32 @@ export const DrillMediaBatchItemSchema = z.object({
   drill_id: uuid(),
   title: z.string().trim().max(200).optional().nullable(),
   description: z.string().trim().max(4000).optional().nullable(),
-  thumbnail_url: z.string()
-    .url("thumbnail_url must be a valid URL")
-    .optional()
-    .nullable(),
+  thumbnail_url: z.string().url("thumbnail_url must be a valid URL").optional().nullable(),
   position: z.number({ coerce: true }).int().min(0).optional().nullable(),
 });
 
-export const DrillMediaBatchSchema = z.object({
-  org_id: uuid(),
-  items: z.array(DrillMediaBatchItemSchema)
-    .min(1, "items must contain at least one entry")
-    .max(100),
-}).superRefine((data, ctx) => {
-  const seenFields = new Set<string>();
+export const DrillMediaBatchSchema = z
+  .object({
+    org_id: uuid(),
+    items: z.array(DrillMediaBatchItemSchema).min(1, "items must contain at least one entry").max(100),
+  })
+  .superRefine((data, ctx) => {
+    const seenFields = new Set<string>();
 
-  for (const [index, item] of data.items.entries()) {
-    const field = item.file_field.trim();
-    if (seenFields.has(field)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["items", index, "file_field"],
-        message: `Duplicate file_field '${field}'`,
-      });
-      continue;
+    for (const [index, item] of data.items.entries()) {
+      const field = item.file_field.trim();
+      if (seenFields.has(field)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["items", index, "file_field"],
+          message: `Duplicate file_field '${field}'`,
+        });
+        continue;
+      }
+
+      seenFields.add(field);
     }
-
-    seenFields.add(field);
-  }
-});
+  });
 
 export type DrillMediaBatchItemInput = z.infer<typeof DrillMediaBatchItemSchema>;
 export type DrillMediaBatchInput = z.infer<typeof DrillMediaBatchSchema>;
@@ -157,7 +148,7 @@ export interface DrillDto {
   created_at: string;
   updated_at: string;
   segment: { id: string; name: string | null } | null;
-  skill_tags: {id: string ; name: string}[];
+  skill_tags: { id: string; name: string }[];
   media: DrillMediaDto[];
 }
 

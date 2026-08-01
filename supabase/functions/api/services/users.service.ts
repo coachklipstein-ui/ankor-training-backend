@@ -1,21 +1,13 @@
 import { sbAdmin } from "./supabase.ts";
 
-const MANAGED_ORG_ROLES = [
-  "owner",
-  "admin",
-  "coach",
-  "athlete",
-  "parent",
-  "staff",
-  "viewer",
-] as const;
+const MANAGED_ORG_ROLES = ["owner", "admin", "coach", "athlete", "parent", "staff", "viewer"] as const;
 
 export type ManagedOrgRole = (typeof MANAGED_ORG_ROLES)[number];
 
 export type OrgUserDto = {
   user_id: string;
   role: "athlete" | "coach";
-  full_name : string | null;
+  full_name: string | null;
   phone: string | null;
   graduation_year: number | null;
 };
@@ -83,11 +75,7 @@ function buildFullName(input: {
 }): string | null {
   const explicit = normalizeText(input.full_name);
   if (explicit) return explicit;
-  return normalizeText(
-    [normalizeText(input.first_name), normalizeText(input.last_name)]
-      .filter(Boolean)
-      .join(" "),
-  );
+  return normalizeText([normalizeText(input.first_name), normalizeText(input.last_name)].filter(Boolean).join(" "));
 }
 
 function mapManagedUserRow(
@@ -112,23 +100,15 @@ function mapManagedUserRow(
   };
 }
 
-export async function listOrgUsers(
-  org_id: string,
-): Promise<{ data: OrgUserDto[]; count: number; error: unknown }> {
+export async function listOrgUsers(org_id: string): Promise<{ data: OrgUserDto[]; count: number; error: unknown }> {
   const client = sbAdmin;
   if (!client) {
     return { data: [], count: 0, error: new Error("Supabase client not initialized") };
   }
 
   const [athletesResult, coachesResult] = await Promise.all([
-    client
-      .from("athletes")
-      .select("user_id, full_name, cell_number, graduation_year")
-      .eq("org_id", org_id),
-    client
-      .from("coaches")
-      .select("user_id, full_name, cell_number")
-      .eq("org_id", org_id),
+    client.from("athletes").select("user_id, full_name, cell_number, graduation_year").eq("org_id", org_id),
+    client.from("coaches").select("user_id, full_name, cell_number").eq("org_id", org_id),
   ]);
 
   if (athletesResult.error) {
@@ -300,9 +280,7 @@ export async function createManagedUser(
     role: input.role,
   };
 
-  const { error: profileError } = await client
-    .from("profiles")
-    .upsert(profilePayload, { onConflict: "id" });
+  const { error: profileError } = await client.from("profiles").upsert(profilePayload, { onConflict: "id" });
 
   if (profileError) {
     try {
@@ -323,14 +301,15 @@ export async function createManagedUser(
     // best-effort legacy table sync
   }
 
-  const { error: membershipError } = await client
-    .from("org_memberships")
-    .upsert({
+  const { error: membershipError } = await client.from("org_memberships").upsert(
+    {
       org_id: input.org_id,
       user_id: userId,
       role: input.role,
       is_active: true,
-    }, { onConflict: "org_id,user_id" });
+    },
+    { onConflict: "org_id,user_id" },
+  );
 
   if (membershipError) {
     try {
@@ -389,10 +368,7 @@ export async function updateManagedUser(
   if (input.org_id) profileUpdates.default_org_id = input.org_id;
 
   if (Object.keys(profileUpdates).length > 0) {
-    const { error } = await client
-      .from("profiles")
-      .update(profileUpdates)
-      .eq("user_id", user_id);
+    const { error } = await client.from("profiles").update(profileUpdates).eq("user_id", user_id);
     if (error) return { data: null, error };
   }
 
@@ -415,9 +391,7 @@ export async function updateManagedUser(
     if (input.role) membershipPayload.role = input.role;
     if (input.is_active !== undefined) membershipPayload.is_active = input.is_active ?? true;
 
-    const { error } = await client
-      .from("org_memberships")
-      .upsert(membershipPayload, { onConflict: "org_id,user_id" });
+    const { error } = await client.from("org_memberships").upsert(membershipPayload, { onConflict: "org_id,user_id" });
     if (error) return { data: null, error };
   }
 

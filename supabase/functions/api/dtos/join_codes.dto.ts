@@ -4,9 +4,13 @@ import { RE_UUID } from "../utils/uuid.ts";
 const uuid = () => z.string().regex(RE_UUID, "Invalid UUID");
 
 const dateString = () =>
-  z.string().trim().min(1).refine((value) => !Number.isNaN(Date.parse(value)), {
-    message: "expires_at must be a valid ISO date string",
-  });
+  z
+    .string()
+    .trim()
+    .min(1)
+    .refine((value) => !Number.isNaN(Date.parse(value)), {
+      message: "expires_at must be a valid ISO date string",
+    });
 
 export const JoinCodeListFilterSchema = z.object({
   org_id: uuid(),

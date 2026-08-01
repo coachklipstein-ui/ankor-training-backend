@@ -11,8 +11,8 @@ function mapGuardianRow(row: any): GuardianDto {
   const links = Array.isArray(row.athlete_guardians)
     ? row.athlete_guardians
     : row.athlete_guardians
-    ? [row.athlete_guardians]
-    : [];
+      ? [row.athlete_guardians]
+      : [];
 
   const athletes = links
     .map((link: any) => ({
@@ -20,9 +20,9 @@ function mapGuardianRow(row: any): GuardianDto {
       relationship: link?.relationship ?? null,
     }))
     .filter((link: { athlete_id: string | null }) => Boolean(link.athlete_id)) as {
-      athlete_id: string;
-      relationship: string | null;
-    }[];
+    athlete_id: string;
+    relationship: string | null;
+  }[];
 
   return {
     id: row.id,
@@ -41,10 +41,7 @@ function mapGuardianRow(row: any): GuardianDto {
   };
 }
 
-async function findUserIdByEmail(
-  client: any,
-  email: string,
-): Promise<{ userId: string | null; error: unknown }> {
+async function findUserIdByEmail(client: any, email: string): Promise<{ userId: string | null; error: unknown }> {
   const admin = client?.auth?.admin;
   if (!admin) {
     return { userId: null, error: new Error("Supabase admin client not available") };
@@ -62,10 +59,7 @@ async function findUserIdByEmail(
       const { data, error } = await admin.listUsers({ page, perPage });
       if (error) return { userId: null, error };
       const users = Array.isArray(data?.users) ? data.users : Array.isArray(data) ? data : [];
-      const match = users.find(
-        (user: any) =>
-          typeof user?.email === "string" && user.email.toLowerCase() === email,
-      );
+      const match = users.find((user: any) => typeof user?.email === "string" && user.email.toLowerCase() === email);
       if (match?.id) return { userId: match.id, error: null };
       if (users.length < perPage) break;
     }
@@ -259,10 +253,7 @@ export async function createGuardian(
   }
 
   const email = input.email.trim().toLowerCase();
-  const { userId: existingUserId, error: userLookupError } = await findUserIdByEmail(
-    client,
-    email,
-  );
+  const { userId: existingUserId, error: userLookupError } = await findUserIdByEmail(client, email);
   if (userLookupError) {
     return { data: null, error: userLookupError };
   }
@@ -329,8 +320,8 @@ export async function createGuardian(
     typeof txData === "string"
       ? txData
       : Array.isArray(txData)
-      ? txData[0]?.guardian_id ?? null
-      : (txData as any)?.guardian_id ?? null;
+        ? (txData[0]?.guardian_id ?? null)
+        : ((txData as any)?.guardian_id ?? null);
 
   if (!guardianId) {
     await client.auth.admin.deleteUser(userId).catch(() => {});
@@ -340,11 +331,7 @@ export async function createGuardian(
   const guardianResult = await getGuardianById(guardianId, input.org_id);
   if (guardianResult.error || !guardianResult.data) {
     try {
-      await client
-        .from("guardian_contacts")
-        .delete()
-        .eq("id", guardianId)
-        .eq("org_id", input.org_id);
+      await client.from("guardian_contacts").delete().eq("id", guardianId).eq("org_id", input.org_id);
     } catch {
       // ignore cleanup failure
     }

@@ -9,14 +9,7 @@ import {
   type CreateManagedUserInput,
   type UpdateManagedUserInput,
 } from "../services/users.service.ts";
-import {
-  badRequest,
-  created,
-  internalError,
-  json,
-  methodNotAllowed,
-  notFound,
-} from "../utils/http.ts";
+import { badRequest, created, internalError, json, methodNotAllowed, notFound } from "../utils/http.ts";
 import type { RequestContext } from "../routes/router.ts";
 import { RE_UUID } from "../utils/uuid.ts";
 
@@ -45,10 +38,7 @@ export async function listOrgUsersController(
   return json(200, { ok: true, count, items: data });
 }
 
-function readString(
-  body: Record<string, unknown>,
-  key: string,
-): string | null {
+function readString(body: Record<string, unknown>, key: string): string | null {
   const value = body[key];
   if (value === undefined || value === null) return null;
   return typeof value === "string" ? value.trim() : "";
@@ -82,8 +72,7 @@ function parseCreateManagedUser(body: unknown): { value?: CreateManagedUserInput
       last_name: readString(obj, "last_name"),
       full_name: readString(obj, "full_name"),
       phone: readString(obj, "phone"),
-      email_confirm:
-        typeof obj.email_confirm === "boolean" ? obj.email_confirm : undefined,
+      email_confirm: typeof obj.email_confirm === "boolean" ? obj.email_confirm : undefined,
     },
   };
 }

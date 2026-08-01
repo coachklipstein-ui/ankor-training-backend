@@ -42,34 +42,26 @@ export type ScorecardSubskillAddInput = ScorecardSubskillInput & {
   category_id: string;
 };
 
-export async function rpcCreateScorecardTemplate(payload: {
-  p_template: unknown;
-  p_created_by?: string;
-}) {
+export async function rpcCreateScorecardTemplate(payload: { p_template: unknown; p_created_by?: string }) {
   return await sbAdmin!.rpc("create_scorecard_template_tx", payload);
 }
 
 export async function listScorecardTemplates(params: {
-  org_id: string;             // required
-  sport_id?: string | null;   // optional
-  q?: string;                 // optional (search name/description)
-  limit?: number;             // default 10, max 200
-  offset?: number;            // default 0
+  org_id: string; // required
+  sport_id?: string | null; // optional
+  q?: string; // optional (search name/description)
+  limit?: number; // default 10, max 200
+  offset?: number; // default 0
 }) {
-  const limit = Number.isFinite(params.limit as number)
-    ? Math.min(Math.max(Number(params.limit), 1), 200)
-    : 10;
+  const limit = Number.isFinite(params.limit as number) ? Math.min(Math.max(Number(params.limit), 1), 200) : 10;
 
-  const offset = Number.isFinite(params.offset as number)
-    ? Math.max(Number(params.offset), 0)
-    : 0;
+  const offset = Number.isFinite(params.offset as number) ? Math.max(Number(params.offset), 0) : 0;
 
   let query = sbAdmin!
     .from("scorecard_templates")
-    .select(
-      "id, org_id, sport_id, name, description, is_active, created_by, created_at, updated_at",
-      { count: "exact" }
-    )
+    .select("id, org_id, sport_id, name, description, is_active, created_by, created_at, updated_at", {
+      count: "exact",
+    })
     .eq("org_id", params.org_id)
     .order("updated_at", { ascending: false })
     .range(offset, offset + (limit - 1));
@@ -84,10 +76,7 @@ export async function listScorecardTemplates(params: {
   return await query; // { data, count, error }
 }
 
-export async function getScorecardTemplateById(args: {
-  org_id: string;
-  template_id: string;
-}) {
+export async function getScorecardTemplateById(args: { org_id: string; template_id: string }) {
   const { org_id, template_id } = args;
 
   const { data, error } = await sbAdmin!
@@ -136,15 +125,11 @@ export async function getScorecardTemplateById(args: {
     return { data: null, error: null };
   }
 
-  const categories = Array.isArray((data as any).scorecard_categories)
-    ? (data as any).scorecard_categories
-    : [];
+  const categories = Array.isArray((data as any).scorecard_categories) ? (data as any).scorecard_categories : [];
   categories.sort((a: any, b: any) => (a?.position ?? 0) - (b?.position ?? 0));
 
   for (const category of categories) {
-    const subskills = Array.isArray(category?.scorecard_subskills)
-      ? category.scorecard_subskills
-      : [];
+    const subskills = Array.isArray(category?.scorecard_subskills) ? category.scorecard_subskills : [];
     subskills.sort((a: any, b: any) => (a?.position ?? 0) - (b?.position ?? 0));
     category.scorecard_subskills = subskills;
   }
@@ -162,14 +147,7 @@ export async function updateScorecardTemplate(args: {
   add_subskills: ScorecardSubskillAddInput[];
   remove_subskill_ids: string[];
 }) {
-  const {
-    org_id,
-    template_id,
-    add_categories,
-    remove_category_ids,
-    add_subskills,
-    remove_subskill_ids,
-  } = args;
+  const { org_id, template_id, add_categories, remove_category_ids, add_subskills, remove_subskill_ids } = args;
 
   const { data: template, error: templateError } = await sbAdmin!
     .from("scorecard_templates")
@@ -195,12 +173,9 @@ export async function updateScorecardTemplate(args: {
     return { data: null, error: categoriesError, notFound: false };
   }
 
-  const existingCategoryIds = new Set(
-    (categories ?? []).map((category) => category.id),
-  );
+  const existingCategoryIds = new Set((categories ?? []).map((category) => category.id));
   const maxCategoryPosition = (categories ?? []).reduce(
-    (max, category) =>
-      Math.max(max, Number.isFinite(category.position) ? category.position : 0),
+    (max, category) => Math.max(max, Number.isFinite(category.position) ? category.position : 0),
     0,
   );
 
@@ -293,21 +268,18 @@ export async function updateScorecardTemplate(args: {
   let categoryPositionCursor = maxCategoryPosition;
 
   for (const category of add_categories) {
-    const position = Number.isFinite(category.position)
-      ? (category.position as number)
-      : (categoryPositionCursor += 1);
+    const position = Number.isFinite(category.position) ? (category.position as number) : (categoryPositionCursor += 1);
 
-    const { data: insertedCategories, error: insertCategoryError } =
-      await sbAdmin!
-        .from("scorecard_categories")
-        .insert({
-          template_id,
-          name: category.name,
-          description: category.description,
-          position,
-        })
-        .select("id")
-        .limit(1);
+    const { data: insertedCategories, error: insertCategoryError } = await sbAdmin!
+      .from("scorecard_categories")
+      .insert({
+        template_id,
+        name: category.name,
+        description: category.description,
+        position,
+      })
+      .select("id")
+      .limit(1);
 
     if (insertCategoryError) {
       return { data: null, error: insertCategoryError, notFound: false };
@@ -330,9 +302,7 @@ export async function updateScorecardTemplate(args: {
         category_id: insertedCategoryId,
         name: subskill.name,
         description: subskill.description,
-        position: Number.isFinite(subskill.position)
-          ? subskill.position
-          : (subskillPositionCursor += 1),
+        position: Number.isFinite(subskill.position) ? subskill.position : (subskillPositionCursor += 1),
         skill_id: subskill.skill_id,
       };
 
@@ -366,15 +336,12 @@ export async function updateScorecardTemplate(args: {
   }
 
   if (add_subskills.length > 0) {
-    const categoryIds = Array.from(
-      new Set(add_subskills.map((subskill) => subskill.category_id)),
-    );
+    const categoryIds = Array.from(new Set(add_subskills.map((subskill) => subskill.category_id)));
 
-    const { data: existingSubskills, error: existingSubskillsError } =
-      await sbAdmin!
-        .from("scorecard_subskills")
-        .select("category_id, position")
-        .in("category_id", categoryIds);
+    const { data: existingSubskills, error: existingSubskillsError } = await sbAdmin!
+      .from("scorecard_subskills")
+      .select("category_id, position")
+      .in("category_id", categoryIds);
 
     if (existingSubskillsError) {
       return { data: null, error: existingSubskillsError, notFound: false };
@@ -391,9 +358,8 @@ export async function updateScorecardTemplate(args: {
 
     const subskillRows = add_subskills.map((subskill) => {
       const current = maxPositions.get(subskill.category_id) ?? 0;
-      const position = typeof subskill.position === "number" && Number.isFinite(subskill.position)
-        ? subskill.position
-        : current + 1;
+      const position =
+        typeof subskill.position === "number" && Number.isFinite(subskill.position) ? subskill.position : current + 1;
       if (!Number.isFinite(subskill.position)) {
         maxPositions.set(subskill.category_id, position);
       }
@@ -447,10 +413,7 @@ export async function updateScorecardTemplate(args: {
   };
 }
 
-export async function deleteScorecardTemplate(args: {
-  org_id: string;
-  template_id: string;
-}) {
+export async function deleteScorecardTemplate(args: { org_id: string; template_id: string }) {
   const { org_id, template_id } = args;
 
   const { data, error } = await sbAdmin!
@@ -535,10 +498,9 @@ export async function listScorecardSubskillsByCategory(args: {
 
   const { data, error, count } = await sbAdmin!
     .from("scorecard_subskills")
-    .select(
-      "id, category_id, skill_id, name, description, position, rating_min, rating_max, created_at",
-      { count: "exact" },
-    )
+    .select("id, category_id, skill_id, name, description, position, rating_min, rating_max, created_at", {
+      count: "exact",
+    })
     .eq("category_id", category_id)
     .order("position", { ascending: true })
     .range(offset, offset + limit - 1);

@@ -19,12 +19,7 @@ export function createAuthRouter(): Router {
   // POST /api/auth/welcome-email/test
   router.add("POST", "welcome-email/test", handleTestWelcomeEmail, [requireAuth]);
   // POST /api/auth/evaluation-reports/test
-  router.add(
-    "POST",
-    "evaluation-reports/test",
-    handleTestBulkEvaluationReportEmails,
-    [requireAuth],
-  );
+  router.add("POST", "evaluation-reports/test", handleTestBulkEvaluationReportEmails, [requireAuth]);
 
   return router;
 }

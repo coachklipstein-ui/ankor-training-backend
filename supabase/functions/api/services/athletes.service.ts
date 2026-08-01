@@ -16,16 +16,12 @@ function buildFullName(first?: string | null, last?: string | null): string | nu
 
 function mapAthleteRow(row: any): AthleteDto {
   const profile = row.profile ?? null;
-  const teamRows = Array.isArray(row.team_athletes)
-    ? row.team_athletes
-    : row.team_athletes
-    ? [row.team_athletes]
-    : [];
+  const teamRows = Array.isArray(row.team_athletes) ? row.team_athletes : row.team_athletes ? [row.team_athletes] : [];
   const guardianRows = Array.isArray(row.athlete_guardians)
     ? row.athlete_guardians
     : row.athlete_guardians
-    ? [row.athlete_guardians]
-    : [];
+      ? [row.athlete_guardians]
+      : [];
   const guardianRow = guardianRows[0] ?? null;
   const guardian = guardianRow?.guardian ?? null;
   const guardianRelationship = guardianRow?.relationship ?? null;
@@ -69,10 +65,7 @@ function mapAthleteRow(row: any): AthleteDto {
   };
 }
 
-async function findUserIdByEmail(
-  client: any,
-  email: string,
-): Promise<{ userId: string | null; error: unknown }> {
+async function findUserIdByEmail(client: any, email: string): Promise<{ userId: string | null; error: unknown }> {
   const admin = client?.auth?.admin;
   if (!admin) {
     return { userId: null, error: new Error("Supabase admin client not available") };
@@ -90,10 +83,7 @@ async function findUserIdByEmail(
       const { data, error } = await admin.listUsers({ page, perPage });
       if (error) return { userId: null, error };
       const users = Array.isArray(data?.users) ? data.users : Array.isArray(data) ? data : [];
-      const match = users.find(
-        (user: any) =>
-          typeof user?.email === "string" && user.email.toLowerCase() === email,
-      );
+      const match = users.find((user: any) => typeof user?.email === "string" && user.email.toLowerCase() === email);
       if (match?.id) return { userId: match.id, error: null };
       if (users.length < perPage) break;
     }
@@ -144,9 +134,7 @@ export async function listAthletes(
     .order("first_name", { ascending: true });
 
   if (name) {
-    query = query.or(
-      `full_name.ilike.%${name}%,first_name.ilike.%${name}%,last_name.ilike.%${name}%`,
-    );
+    query = query.or(`full_name.ilike.%${name}%,first_name.ilike.%${name}%,last_name.ilike.%${name}%`);
   }
   if (email) {
     query = query.ilike("profiles.email", `%${email}%`);
@@ -200,9 +188,7 @@ export async function getAthleteById(
   return { data: data ? mapAthleteRow(data) : null, error: null };
 }
 
-export async function createAthlete(
-  input: CreateAthleteInput,
-): Promise<{ data: AthleteDto | null; error: unknown }> {
+export async function createAthlete(input: CreateAthleteInput): Promise<{ data: AthleteDto | null; error: unknown }> {
   const client = sbAdmin;
   if (!client) {
     return { data: null, error: new Error("Supabase client not initialized") };
@@ -245,12 +231,8 @@ export async function createAthlete(
   const guardianPhone = input.parent_mobile_phone?.trim() ?? null;
   const guardianFullName = input.parent_full_name?.trim() ?? null;
   const guardianRelationship = input.relationship ?? null;
-  const hasGuardianInfo = Boolean(
-    guardianEmail || guardianPhone || guardianFullName || guardianRelationship,
-  );
-  const guardianMatchesAthlete = guardianEmail
-    ? athleteEmail.toLowerCase() === guardianEmail.toLowerCase()
-    : false;
+  const hasGuardianInfo = Boolean(guardianEmail || guardianPhone || guardianFullName || guardianRelationship);
+  const guardianMatchesAthlete = guardianEmail ? athleteEmail.toLowerCase() === guardianEmail.toLowerCase() : false;
 
   let guardianRow: { id?: string | null; user_id?: string | null } | null = null;
   if (guardianEmail) {
@@ -268,34 +250,62 @@ export async function createAthlete(
     guardianRow = guardianByEmail ?? null;
   }
 
-  const guardianUserIdFromEmail =
-    typeof guardianRow?.user_id === "string" ? guardianRow.user_id.trim() : null;
-
+  const guardianUserIdFromEmail = typeof guardianRow?.user_id === "string" ? guardianRow.user_id.trim() : null;
 
   let userId: string | null = null;
   let athleteUserCreated = false;
-  
+
   let guardianId = guardianRow?.id ?? null;
   let guardianUserId: string | null = guardianUserIdFromEmail;
   let guardianUserCreated = false;
 
-
-  // 1. if the guardian and athlete has the same email but the guardian does exits then create the parent  
+  // 1. if the guardian and athlete has the same email but the guardian does exits then create the parent
   if (hasGuardianInfo && !guardianUserIdFromEmail && guardianEmail && guardianFullName && guardianPhone) {
-      const firstName = guardianFullName.split('')[0]
-      const lastName = guardianFullName.split('')[1]
+    const firstName = guardianFullName.split("")[0];
+    const lastName = guardianFullName.split("")[1];
 
+    const { data: created, error: createErr } = await client.auth.admin.createUser({
+      email: guardianEmail,
+      password: input.password,
+      user_metadata: {
+        first_name: firstName,
+        last_name: lastName,
+        full_name: guardianFullName,
+        cell_number: guardianPhone,
+      },
+      app_metadata: { role: "parent" },
+      email_confirm: true,
+    });
+
+    if (createErr) {
+      return { data: null, error: createErr };
+    }
+
+    guardianUserId = created.user?.id ?? null;
+    if (!guardianUserId) {
+      return { data: null, error: new Error("User was not returned by Supabase") };
+    }
+  }
+
+  //creating athlete user when parent email and athlete email are different
+  if (!guardianMatchesAthlete) {
+    const email = input.email.trim().toLowerCase();
+    const { userId: existingUserId, error: userLookupError } = await findUserIdByEmail(client, email);
+    if (userLookupError) {
+      return { data: null, error: userLookupError };
+    }
+    const exists = Boolean(existingUserId);
+    //if the user does not exist then create athlete user
+    if (!exists) {
       const { data: created, error: createErr } = await client.auth.admin.createUser({
-        email: guardianEmail,
+        email: athleteEmail,
         password: input.password,
-        user_metadata: 
-        {  
-            first_name: firstName,
-            last_name: lastName,
-            full_name: guardianFullName,
-            cell_number: guardianPhone,
-        },         
-        app_metadata: { role:  "parent"   },
+        user_metadata: {
+          first_name: input.first_name,
+          last_name: input.last_name,
+          cell_number: input.cell_number ?? null,
+        },
+        app_metadata: { role: "athlete" },
         email_confirm: true,
       });
 
@@ -303,53 +313,15 @@ export async function createAthlete(
         return { data: null, error: createErr };
       }
 
-      guardianUserId = created.user?.id ?? null;
-      if (!guardianUserId) {
+      userId = created.user?.id ?? null;
+      if (!userId) {
         return { data: null, error: new Error("User was not returned by Supabase") };
       }
-     
-  }
-    
-  //creating athlete user when parent email and athlete email are different
-  if(!guardianMatchesAthlete){
-     const email = input.email.trim().toLowerCase()
-     const { userId: existingUserId, error: userLookupError } = await findUserIdByEmail(
-       client,
-       email,
-     );
-     if (userLookupError) {
-       return { data: null, error: userLookupError };
-     }
-     const exists = Boolean(existingUserId);
-     //if the user does not exist then create athlete user
-     if(!exists){
-        const { data: created, error: createErr } = await client.auth.admin.createUser({
-          email: athleteEmail,
-          password: input.password,
-          user_metadata: {
-              first_name: input.first_name,
-              last_name: input.last_name,
-              cell_number: input.cell_number ?? null,
-          },
-          app_metadata: { role: "athlete" },
-          email_confirm: true,
-        });
-  
-        if (createErr) {
-          return { data: null, error: createErr };
-        }
-  
-        userId = created.user?.id ?? null;
-        if (!userId) {
-          return { data: null, error: new Error("User was not returned by Supabase") };
-        }
-        athleteUserCreated = true;
-     }
-     if (existingUserId) {
-       userId = existingUserId;
-     }
-     
-    
+      athleteUserCreated = true;
+    }
+    if (existingUserId) {
+      userId = existingUserId;
+    }
   }
 
   if (guardianMatchesAthlete) {
@@ -360,7 +332,6 @@ export async function createAthlete(
       userId = guardianUserId;
     }
   }
-    
 
   const { data: txData, error: txErr } = await client.rpc("create_athlete_tx", {
     p_user_id: userId,
@@ -396,8 +367,8 @@ export async function createAthlete(
     typeof txData === "string"
       ? txData
       : Array.isArray(txData)
-      ? txData[0]?.athlete_id ?? null
-      : (txData as any)?.athlete_id ?? null;
+        ? (txData[0]?.athlete_id ?? null)
+        : ((txData as any)?.athlete_id ?? null);
 
   if (!athleteId) {
     if (athleteUserCreated && userId) {
@@ -410,20 +381,14 @@ export async function createAthlete(
   }
 
   if (positionId) {
-    const { error: positionsError } = await client
-      .from("athlete_positions")
-      .insert({
-        athlete_id: athleteId,
-        position_id: positionId,
-      });
+    const { error: positionsError } = await client.from("athlete_positions").insert({
+      athlete_id: athleteId,
+      position_id: positionId,
+    });
 
     if (positionsError) {
       try {
-        await client
-          .from("athletes")
-          .delete()
-          .eq("id", athleteId)
-          .eq("org_id", input.org_id);
+        await client.from("athletes").delete().eq("id", athleteId).eq("org_id", input.org_id);
       } catch {
         // ignore cleanup failure
       }
@@ -434,11 +399,7 @@ export async function createAthlete(
         await client.auth.admin.deleteUser(guardianUserId).catch(() => {});
         if (guardianEmail) {
           try {
-            await client
-              .from("guardian_contacts")
-              .delete()
-              .eq("org_id", input.org_id)
-              .ilike("email", guardianEmail);
+            await client.from("guardian_contacts").delete().eq("org_id", input.org_id).ilike("email", guardianEmail);
           } catch {
             // ignore cleanup failure
           }
@@ -451,11 +412,7 @@ export async function createAthlete(
   const athleteResult = await getAthleteById(athleteId, input.org_id);
   if (athleteResult.error || !athleteResult.data) {
     try {
-      await client
-        .from("athletes")
-        .delete()
-        .eq("id", athleteId)
-        .eq("org_id", input.org_id);
+      await client.from("athletes").delete().eq("id", athleteId).eq("org_id", input.org_id);
     } catch {
       // ignore cleanup failure
     }
@@ -466,11 +423,7 @@ export async function createAthlete(
       await client.auth.admin.deleteUser(guardianUserId).catch(() => {});
       if (guardianEmail) {
         try {
-          await client
-            .from("guardian_contacts")
-            .delete()
-            .eq("org_id", input.org_id)
-            .ilike("email", guardianEmail);
+          await client.from("guardian_contacts").delete().eq("org_id", input.org_id).ilike("email", guardianEmail);
         } catch {
           // ignore cleanup failure
         }
@@ -483,9 +436,7 @@ export async function createAthlete(
   }
 
   try {
-    const welcomeName = athleteResult.data.full_name ??
-      full_name ??
-      buildFullName(input.first_name, input.last_name);
+    const welcomeName = athleteResult.data.full_name ?? full_name ?? buildFullName(input.first_name, input.last_name);
     const role = guardianMatchesAthlete ? "parent" : "athlete";
     const data: Record<string, unknown> = { role };
     if (userId) data.user_id = userId;
@@ -518,8 +469,8 @@ export async function updateAthlete(
   if (input.cell_number !== undefined) patch.cell_number = input.cell_number;
   if (input.graduation_year !== undefined) patch.graduation_year = input.graduation_year;
 
-  const needsFullName = input.full_name === undefined &&
-    (input.first_name !== undefined || input.last_name !== undefined);
+  const needsFullName =
+    input.full_name === undefined && (input.first_name !== undefined || input.last_name !== undefined);
 
   if (needsFullName) {
     const { data: current, error: currentError } = await client
@@ -550,11 +501,7 @@ export async function updateAthlete(
       return { data: null, error: new Error("Athlete not found") };
     }
   } else {
-    const { data, error } = await client
-      .from("athletes")
-      .select("id")
-      .eq("id", athlete_id)
-      .eq("org_id", org_id);
+    const { data, error } = await client.from("athletes").select("id").eq("id", athlete_id).eq("org_id", org_id);
 
     if (error) return { data: null, error };
     if (!data || data.length === 0) {
@@ -574,12 +521,7 @@ export async function deleteAthlete(
     return { data: null, error: new Error("Supabase client not initialized") };
   }
 
-  const { data, error } = await client
-    .from("athletes")
-    .delete()
-    .eq("id", athlete_id)
-    .eq("org_id", org_id)
-    .select("id");
+  const { data, error } = await client.from("athletes").delete().eq("id", athlete_id).eq("org_id", org_id).select("id");
 
   if (error) return { data: null, error };
   if (!data || data.length === 0) {

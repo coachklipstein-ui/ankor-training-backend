@@ -92,11 +92,7 @@ export async function createJoinCode(
     disabled: input.disabled ?? false,
   };
 
-  const { data, error } = await sbAdmin
-    .from("join_codes")
-    .insert(payload)
-    .select(SELECT_FIELDS)
-    .maybeSingle();
+  const { data, error } = await sbAdmin.from("join_codes").insert(payload).select(SELECT_FIELDS).maybeSingle();
 
   if (error) return { data: null, error };
   if (!data) return { data: null, error: new Error("Failed to create join code") };

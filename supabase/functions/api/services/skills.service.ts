@@ -83,10 +83,7 @@ function resolveSkillsBucket(value?: string | null): string | null {
   return null;
 }
 
-async function ensureSkillOrg(
-  skill_id: string,
-  org_id: string,
-): Promise<{ error: unknown }> {
+async function ensureSkillOrg(skill_id: string, org_id: string): Promise<{ error: unknown }> {
   const client = sbAdmin;
   if (!client) {
     return { error: new Error("Supabase client not initialized") };
@@ -110,21 +107,13 @@ async function ensureSkillOrg(
   return { error: null };
 }
 
-function mapSkillMediaRow(
-  row: any,
-  fallbackBucket: string | null,
-): SkillMediaRecordDto {
+function mapSkillMediaRow(row: any, fallbackBucket: string | null): SkillMediaRecordDto {
   const url = typeof row?.url === "string" ? row.url : "";
   const parsed = url ? parseStorageObjectUrl(url) : null;
-  const bucket = typeof row?.bucket === "string"
-    ? row.bucket
-    : parsed?.bucket ?? fallbackBucket;
+  const bucket = typeof row?.bucket === "string" ? row.bucket : (parsed?.bucket ?? fallbackBucket);
   const object_path = row?.object_path ?? row?.storage_path ?? parsed?.path ?? "";
-  const position = typeof row?.position === "number"
-    ? row.position
-    : typeof row?.sort_order === "number"
-    ? row.sort_order
-    : null;
+  const position =
+    typeof row?.position === "number" ? row.position : typeof row?.sort_order === "number" ? row.sort_order : null;
 
   return {
     id: row?.id ?? "",
@@ -140,9 +129,7 @@ function mapSkillMediaRow(
   };
 }
 
-function parseStorageObjectUrl(
-  value: string,
-): { bucket: string; path: string } | null {
+function parseStorageObjectUrl(value: string): { bucket: string; path: string } | null {
   let url: URL;
   try {
     url = new URL(value);
@@ -157,7 +144,7 @@ function parseStorageObjectUrl(
   const parts = rest.split("/").filter(Boolean);
   if (parts.length < 2) return null;
 
-  const offset = (parts[0] === "public" || parts[0] === "sign") ? 1 : 0;
+  const offset = parts[0] === "public" || parts[0] === "sign" ? 1 : 0;
   if (parts.length - offset < 2) return null;
 
   const bucket = parts[offset];
@@ -291,10 +278,9 @@ export async function listSkills(params: {
 
   let query = sbAdmin!
     .from("skills")
-    .select(
-      "id, org_id, sport_id, category, title, description, level, visibility, status, created_at, updated_at",
-      { count: "exact" }
-    )
+    .select("id, org_id, sport_id, category, title, description, level, visibility, status, created_at, updated_at", {
+      count: "exact",
+    })
     .eq("sport_id", sportId)
     .order("title", { ascending: true })
     .range(offset, offset + (limit - 1));
@@ -308,16 +294,12 @@ export async function listSkills(params: {
 export async function getSkillById(skill_id: string) {
   return await sbAdmin!
     .from("skills")
-    .select(
-      "id, org_id, sport_id, category, title, description, level, visibility, status, created_at, updated_at",
-    )
+    .select("id, org_id, sport_id, category, title, description, level, visibility, status, created_at, updated_at")
     .eq("id", skill_id)
     .maybeSingle();
 }
 
-export async function createSkill(
-  input: CreateSkillInput,
-): Promise<{ data: any | null; error: unknown }> {
+export async function createSkill(input: CreateSkillInput): Promise<{ data: any | null; error: unknown }> {
   if (!sbAdmin) {
     return { data: null, error: new Error("Supabase client not initialized") };
   }
@@ -336,9 +318,7 @@ export async function createSkill(
   const { data, error } = await sbAdmin
     .from("skills")
     .insert(payload)
-    .select(
-      "id, org_id, sport_id, category, title, description, level, visibility, status, created_at, updated_at",
-    )
+    .select("id, org_id, sport_id, category, title, description, level, visibility, status, created_at, updated_at")
     .maybeSingle();
 
   if (error) return { data: null, error };
@@ -376,9 +356,7 @@ export async function updateSkill(
     .update(patch)
     .eq("id", skill_id)
     .eq("org_id", org_id)
-    .select(
-      "id, org_id, sport_id, category, title, description, level, visibility, status, created_at, updated_at",
-    )
+    .select("id, org_id, sport_id, category, title, description, level, visibility, status, created_at, updated_at")
     .maybeSingle();
 
   if (error) return { data: null, error };
@@ -403,9 +381,7 @@ export async function createSkillMediaUploadUrl(
   const path = buildSkillMediaPath(input);
   const bucket = SKILLS_MEDIA_BUCKET;
 
-  const { data, error } = await client.storage
-    .from(bucket)
-    .createSignedUploadUrl(path);
+  const { data, error } = await client.storage.from(bucket).createSignedUploadUrl(path);
 
   if (error || !data?.signedUrl || !data.token) {
     return { data: null, error: error ?? new Error("Failed to create upload URL") };
@@ -459,10 +435,7 @@ export async function createSkillMedia(
     }
   }
 
-  const { data: existing, error: existingError } = await getExistingSkillMediaByUrl(
-    input.skill_id,
-    url,
-  );
+  const { data: existing, error: existingError } = await getExistingSkillMediaByUrl(input.skill_id, url);
   if (existingError) {
     return { data: null, error: existingError };
   }
@@ -483,9 +456,7 @@ export async function createSkillMedia(
       return { data: null, error: lastError };
     }
 
-    const lastOrder = typeof lastRow?.sort_order === "number"
-      ? lastRow.sort_order
-      : null;
+    const lastOrder = typeof lastRow?.sort_order === "number" ? lastRow.sort_order : null;
     position = lastOrder !== null ? lastOrder + 1 : 1;
   }
 
@@ -507,11 +478,7 @@ export async function createSkillMedia(
   }
 
   if (media_type === "video") {
-    const { error: replaceError } = await removeOtherSkillVideoMedia(
-      input.skill_id,
-      data.id,
-      url,
-    );
+    const { error: replaceError } = await removeOtherSkillVideoMedia(input.skill_id, data.id, url);
 
     if (replaceError) {
       return { data: null, error: replaceError };
@@ -521,12 +488,10 @@ export async function createSkillMedia(
   return { data: mapSkillMediaRow(data, null), error: null };
 }
 
-export async function uploadSkillMediaBatch(
-  input: {
-    org_id: string;
-    items: SkillMediaBatchUploadItem[];
-  },
-): Promise<{ data: SkillMediaBatchResult | null; error: unknown }> {
+export async function uploadSkillMediaBatch(input: {
+  org_id: string;
+  items: SkillMediaBatchUploadItem[];
+}): Promise<{ data: SkillMediaBatchResult | null; error: unknown }> {
   const client = sbAdmin;
   if (!client) {
     return { data: null, error: new Error("Supabase client not initialized") };

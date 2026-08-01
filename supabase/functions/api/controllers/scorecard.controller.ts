@@ -1,6 +1,6 @@
 // supabase/functions/_shared/controllers/scorecards.ts
 import { ScorecardTemplateCreateSchema } from "../schemas/schemas.ts";
-import { badRequest, json, notFound, serverError} from "../utils/responses.ts";
+import { badRequest, json, notFound, serverError } from "../utils/responses.ts";
 import {
   deleteScorecardTemplate,
   getScorecardTemplateById,
@@ -71,10 +71,7 @@ function parseUuidArray(value: unknown, field: string): string[] {
   });
 }
 
-function parseSubskillInput(
-  raw: unknown,
-  fieldPrefix: string,
-): ScorecardSubskillInput {
+function parseSubskillInput(raw: unknown, fieldPrefix: string): ScorecardSubskillInput {
   if (!raw || typeof raw !== "object") {
     throw new Error(`${fieldPrefix} must be an object`);
   }
@@ -90,10 +87,7 @@ function parseSubskillInput(
     throw new Error(`${fieldPrefix}.skill_id (UUID) is required`);
   }
 
-  const description =
-    obj.description === undefined || obj.description === null
-      ? null
-      : String(obj.description).trim();
+  const description = obj.description === undefined || obj.description === null ? null : String(obj.description).trim();
 
   const position = parsePosition(obj.position, `${fieldPrefix}.position`);
   const rating_min = parseRatingMin(obj.rating_min, `${fieldPrefix}.rating_min`);
@@ -111,10 +105,7 @@ function parseSubskillInput(
   };
 }
 
-function parseCategoryInput(
-  raw: unknown,
-  index: number,
-): ScorecardCategoryInput {
+function parseCategoryInput(raw: unknown, index: number): ScorecardCategoryInput {
   if (!raw || typeof raw !== "object") {
     throw new Error(`add_categories[${index}] must be an object`);
   }
@@ -125,24 +116,15 @@ function parseCategoryInput(
     throw new Error(`add_categories[${index}].name is required`);
   }
 
-  const description =
-    obj.description === undefined || obj.description === null
-      ? null
-      : String(obj.description).trim();
-  const position = parsePosition(
-    obj.position,
-    `add_categories[${index}].position`,
-  );
+  const description = obj.description === undefined || obj.description === null ? null : String(obj.description).trim();
+  const position = parsePosition(obj.position, `add_categories[${index}].position`);
 
   if (!Array.isArray(obj.subskills) || obj.subskills.length === 0) {
     throw new Error(`add_categories[${index}].subskills must be a non-empty array`);
   }
 
   const subskills = obj.subskills.map((subskill, subIndex) =>
-    parseSubskillInput(
-      subskill,
-      `add_categories[${index}].subskills[${subIndex}]`,
-    ),
+    parseSubskillInput(subskill, `add_categories[${index}].subskills[${subIndex}]`),
   );
 
   return {
@@ -153,25 +135,18 @@ function parseCategoryInput(
   };
 }
 
-function parseSubskillAddInput(
-  raw: unknown,
-  index: number,
-): ScorecardSubskillAddInput {
+function parseSubskillAddInput(raw: unknown, index: number): ScorecardSubskillAddInput {
   if (!raw || typeof raw !== "object") {
     throw new Error(`add_subskills[${index}] must be an object`);
   }
 
   const obj = raw as Record<string, unknown>;
-  const category_id =
-    typeof obj.category_id === "string" ? obj.category_id.trim() : "";
+  const category_id = typeof obj.category_id === "string" ? obj.category_id.trim() : "";
   if (!RE_UUID.test(category_id)) {
     throw new Error(`add_subskills[${index}].category_id (UUID) is required`);
   }
 
-  const parsed = parseSubskillInput(
-    raw,
-    `add_subskills[${index}]`,
-  );
+  const parsed = parseSubskillInput(raw, `add_subskills[${index}]`);
 
   return {
     ...parsed,
@@ -239,15 +214,21 @@ export async function handleScorecardsCreateTemplate(
   const { data: rpcData, error: rpcErr } = await rpcCreateScorecardTemplate(rpcArgs);
   if (rpcErr || !rpcData?.length) {
     const m = rpcErr?.message ?? "RPC returned no data";
-    const friendly =
-      m.includes("FORBIDDEN") ? "You do not have permission for this organization." :
-      m.includes("CATEGORY_NEEDS_ONE_SUBSKILL") ? "Each category must have at least one subskill." :
-      m.includes("SUBSKILL_SKILL_REQUIRED") ? "Each subskill must include a valid skill_id." :
-      m.includes("SUBSKILL_SKILL_NOT_IN_ORG_OR_SPORT") ? "One or more skills do not belong to this org/sport." :
-      m.includes("AT_LEAST_ONE_CATEGORY_REQUIRED") ? "At least one category is required." :
-      m.includes("NAME_REQUIRED") ? "Template name is required." :
-      m.includes("ORG_REQUIRED") ? "org_id is required." :
-      null;
+    const friendly = m.includes("FORBIDDEN")
+      ? "You do not have permission for this organization."
+      : m.includes("CATEGORY_NEEDS_ONE_SUBSKILL")
+        ? "Each category must have at least one subskill."
+        : m.includes("SUBSKILL_SKILL_REQUIRED")
+          ? "Each subskill must include a valid skill_id."
+          : m.includes("SUBSKILL_SKILL_NOT_IN_ORG_OR_SPORT")
+            ? "One or more skills do not belong to this org/sport."
+            : m.includes("AT_LEAST_ONE_CATEGORY_REQUIRED")
+              ? "At least one category is required."
+              : m.includes("NAME_REQUIRED")
+                ? "Template name is required."
+                : m.includes("ORG_REQUIRED")
+                  ? "org_id is required."
+                  : null;
 
     return serverError(friendly ?? `Failed to create template: ${m}`, origin);
   }
@@ -341,9 +322,7 @@ export async function handleScorecardUpdate(
 
   try {
     const body = payload as Record<string, unknown>;
-    const org_id = typeof body.org_id === "string"
-      ? body.org_id.trim()
-      : (ctx?.org_id ?? "");
+    const org_id = typeof body.org_id === "string" ? body.org_id.trim() : (ctx?.org_id ?? "");
 
     if (!RE_UUID.test(org_id)) {
       return badRequest("org_id (UUID) is required", origin);
@@ -352,17 +331,11 @@ export async function handleScorecardUpdate(
     const add_categories = Array.isArray(body.add_categories)
       ? body.add_categories.map((category, index) => parseCategoryInput(category, index))
       : [];
-    const remove_category_ids = parseUuidArray(
-      body.remove_category_ids,
-      "remove_category_ids",
-    );
+    const remove_category_ids = parseUuidArray(body.remove_category_ids, "remove_category_ids");
     const add_subskills = Array.isArray(body.add_subskills)
       ? body.add_subskills.map((subskill, index) => parseSubskillAddInput(subskill, index))
       : [];
-    const remove_subskill_ids = parseUuidArray(
-      body.remove_subskill_ids,
-      "remove_subskill_ids",
-    );
+    const remove_subskill_ids = parseUuidArray(body.remove_subskill_ids, "remove_subskill_ids");
 
     if (
       add_categories.length === 0 &&
@@ -373,7 +346,11 @@ export async function handleScorecardUpdate(
       return badRequest("At least one update action is required", origin);
     }
 
-    const { data, error, notFound: missing } = await updateScorecardTemplate({
+    const {
+      data,
+      error,
+      notFound: missing,
+    } = await updateScorecardTemplate({
       org_id,
       template_id,
       add_categories,
@@ -416,7 +393,11 @@ export async function handleScorecardDelete(
     return badRequest("org_id (UUID) is required", origin);
   }
 
-  const { data, error, notFound: missing } = await deleteScorecardTemplate({
+  const {
+    data,
+    error,
+    notFound: missing,
+  } = await deleteScorecardTemplate({
     org_id,
     template_id,
   });
@@ -443,15 +424,11 @@ export async function handleScorecardCategoriesByTemplate(
 
   const url = new URL(req.url);
   const org_id = (url.searchParams.get("org_id") ?? "").trim();
-  const scorecard_template_id =
-    (url.searchParams.get("scorecard_template_id") ?? "").trim();
+  const scorecard_template_id = (url.searchParams.get("scorecard_template_id") ?? "").trim();
 
   const limitRaw = url.searchParams.get("limit");
   const offsetRaw = url.searchParams.get("offset");
-  const limit = Math.min(
-    Math.max(parseInt(limitRaw ?? "100", 10) || 100, 1),
-    500,
-  );
+  const limit = Math.min(Math.max(parseInt(limitRaw ?? "100", 10) || 100, 1), 500);
   const offset = Math.max(parseInt(offsetRaw ?? "0", 10) || 0, 0);
 
   if (!RE_UUID.test(org_id)) {
@@ -488,10 +465,7 @@ export async function handleScorecardSubskillsByCategory(
 
   const limitRaw = url.searchParams.get("limit");
   const offsetRaw = url.searchParams.get("offset");
-  const limit = Math.min(
-    Math.max(parseInt(limitRaw ?? "100", 10) || 100, 1),
-    500,
-  );
+  const limit = Math.min(Math.max(parseInt(limitRaw ?? "100", 10) || 100, 1), 500);
   const offset = Math.max(parseInt(offsetRaw ?? "0", 10) || 0, 0);
 
   if (!RE_UUID.test(org_id)) {

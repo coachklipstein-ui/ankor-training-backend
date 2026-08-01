@@ -1,7 +1,4 @@
-import {
-  EvaluationInput,
-  EvaluationItemInput,
-} from "../schemas/evaluations.ts";
+import { EvaluationInput, EvaluationItemInput } from "../schemas/evaluations.ts";
 import {
   rpcBulkCreateEvaluations,
   listEvaluations,
@@ -22,17 +19,8 @@ import {
   buildEvaluationReportEmailInputs,
 } from "../services/evaluations.service.ts";
 import { sendBulkEvaluationReportEmails } from "../services/email.service.ts";
-import {
-  badRequest,
-  created,
-  internalError,
-  methodNotAllowed,
-  json,
-} from "../utils/http.ts";
-import {
-  EvaluationDetailDto,
-  type EvaluationMatrixUpdateDto,
-} from "../dtos/evaluations.dto.ts";
+import { badRequest, created, internalError, methodNotAllowed, json } from "../utils/http.ts";
+import { EvaluationDetailDto, type EvaluationMatrixUpdateDto } from "../dtos/evaluations.dto.ts";
 import { jsonResponse } from "../utils/http.ts";
 import type { RequestContext } from "../routes/router.ts";
 import { RE_UUID } from "../utils/uuid.ts";
@@ -58,8 +46,7 @@ function formatEvaluationDate(value: string | null): string | null {
   const year = parts.find((p) => p.type === "year")?.value ?? "";
   const hour = parts.find((p) => p.type === "hour")?.value ?? "";
   const minute = parts.find((p) => p.type === "minute")?.value ?? "";
-  const dayPeriod =
-    parts.find((p) => p.type === "dayPeriod")?.value?.toUpperCase() ?? "";
+  const dayPeriod = parts.find((p) => p.type === "dayPeriod")?.value?.toUpperCase() ?? "";
 
   if (!month || !day || !year || !hour || !minute || !dayPeriod) {
     return null;
@@ -95,52 +82,35 @@ function normalizeDateInput(value: string, boundary: "start" | "end"): string | 
  * Validate a single evaluation item
  * Now requires athlete_id on each item.
  */
-function parseEvaluationItem(
-  raw: unknown,
-  evalIndex: number,
-  itemIndex: number,
-): EvaluationItemInput {
+function parseEvaluationItem(raw: unknown, evalIndex: number, itemIndex: number): EvaluationItemInput {
   if (!raw || typeof raw !== "object") {
-    throw new Error(
-      `evaluations[${evalIndex}].evaluation_items[${itemIndex}] must be an object`,
-    );
+    throw new Error(`evaluations[${evalIndex}].evaluation_items[${itemIndex}] must be an object`);
   }
 
   const item = raw as Record<string, unknown>;
 
   if (!item.athlete_id || typeof item.athlete_id !== "string") {
-    throw new Error(
-      `evaluations[${evalIndex}].evaluation_items[${itemIndex}].athlete_id is required (string)`,
-    );
+    throw new Error(`evaluations[${evalIndex}].evaluation_items[${itemIndex}].athlete_id is required (string)`);
   }
 
   if (!item.skill_id || typeof item.skill_id !== "string") {
-    throw new Error(
-      `evaluations[${evalIndex}].evaluation_items[${itemIndex}].skill_id is required (string)`,
-    );
+    throw new Error(`evaluations[${evalIndex}].evaluation_items[${itemIndex}].skill_id is required (string)`);
   }
 
   if (typeof item.rating !== "number" || !Number.isFinite(item.rating)) {
-    throw new Error(
-      `evaluations[${evalIndex}].evaluation_items[${itemIndex}].rating must be a number`,
-    );
+    throw new Error(`evaluations[${evalIndex}].evaluation_items[${itemIndex}].rating must be a number`);
   }
 
   // Optional: enforce rating range 1–5 (DB constraint was removed, we keep it in app layer)
   if (item.rating < 1 || item.rating > 5) {
-    throw new Error(
-      `evaluations[${evalIndex}].evaluation_items[${itemIndex}].rating must be between 1 and 5`,
-    );
+    throw new Error(`evaluations[${evalIndex}].evaluation_items[${itemIndex}].rating must be between 1 and 5`);
   }
 
   return {
     athlete_id: item.athlete_id,
     skill_id: item.skill_id,
     rating: item.rating,
-    comments:
-      item.comments === undefined || item.comments === null
-        ? null
-        : String(item.comments),
+    comments: item.comments === undefined || item.comments === null ? null : String(item.comments),
   };
 }
 
@@ -172,32 +142,22 @@ function parseEvaluation(raw: unknown, index: number): EvaluationInput {
     }
   }
 
-  if (
-    !Array.isArray(obj.evaluation_items) ||
-    obj.evaluation_items.length === 0
-  ) {
-    throw new Error(
-      `evaluations[${index}].evaluation_items must be a non-empty array`,
-    );
+  if (!Array.isArray(obj.evaluation_items) || obj.evaluation_items.length === 0) {
+    throw new Error(`evaluations[${index}].evaluation_items must be a non-empty array`);
   }
 
-  const items: EvaluationItemInput[] = obj.evaluation_items.map(
-    (item: unknown, itemIndex: number) =>
-      parseEvaluationItem(item, index, itemIndex),
+  const items: EvaluationItemInput[] = obj.evaluation_items.map((item: unknown, itemIndex: number) =>
+    parseEvaluationItem(item, index, itemIndex),
   );
 
-  const team_id =
-    obj.team_id === undefined || obj.team_id === null || obj.team_id === ""
-      ? null
-      : String(obj.team_id);
+  const team_id = obj.team_id === undefined || obj.team_id === null || obj.team_id === "" ? null : String(obj.team_id);
 
   return {
     org_id: String(obj.org_id),
     scorecard_template_id: String(obj.scorecard_template_id),
     team_id,
     coach_id: String(obj.coach_id),
-    notes:
-      obj.notes === undefined || obj.notes === null ? null : String(obj.notes),
+    notes: obj.notes === undefined || obj.notes === null ? null : String(obj.notes),
     evaluation_items: items,
   };
 }
@@ -223,8 +183,8 @@ export async function bulkCreateEvaluationsController(
     }
 
     // ✅ Validate + normalize payload into EvaluationInput[]
-    const evaluations: EvaluationInput[] = body.evaluations.map(
-      (rawEval: unknown, index: number) => parseEvaluation(rawEval, index),
+    const evaluations: EvaluationInput[] = body.evaluations.map((rawEval: unknown, index: number) =>
+      parseEvaluation(rawEval, index),
     );
 
     // 🔁 Call RPC service (evaluations_bulk_create_tx)
@@ -309,12 +269,8 @@ export async function handleLatestEvaluations(
     }
 
     const coachParam = qp(url, "coach");
-    const coach_name =
-      qp(url, "coach_name") ??
-      (coachParam && !RE_UUID.test(coachParam) ? coachParam : undefined);
-    const coach_id =
-      qp(url, "coach_id") ??
-      (coachParam && RE_UUID.test(coachParam) ? coachParam : undefined);
+    const coach_name = qp(url, "coach_name") ?? (coachParam && !RE_UUID.test(coachParam) ? coachParam : undefined);
+    const coach_id = qp(url, "coach_id") ?? (coachParam && RE_UUID.test(coachParam) ? coachParam : undefined);
 
     const scorecard_name = qp(url, "scorecard_name");
     const athlete_name = qp(url, "athlete_name");
@@ -327,12 +283,8 @@ export async function handleLatestEvaluations(
     const dateToRaw = qp(url, "date_to");
     const dateRaw = qp(url, "date");
 
-    let date_from = dateFromRaw
-      ? normalizeDateInput(dateFromRaw, "start")
-      : undefined;
-    let date_to = dateToRaw
-      ? normalizeDateInput(dateToRaw, "end")
-      : undefined;
+    let date_from = dateFromRaw ? normalizeDateInput(dateFromRaw, "start") : undefined;
+    let date_to = dateToRaw ? normalizeDateInput(dateToRaw, "end") : undefined;
 
     if (dateFromRaw && !date_from) {
       return badRequest("date_from must be a valid date");
@@ -353,9 +305,7 @@ export async function handleLatestEvaluations(
 
     const limitRaw = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
     const offsetRaw = Number.parseInt(url.searchParams.get("offset") ?? "", 10);
-    const limit = Number.isFinite(limitRaw)
-      ? Math.min(Math.max(limitRaw, 1), 200)
-      : 20;
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 200) : 20;
     const offset = Number.isFinite(offsetRaw) ? Math.max(offsetRaw, 0) : 0;
     const { data, count, error } = await listLatestEvaluationsByAthlete({
       org_id,
@@ -420,9 +370,7 @@ export async function handleEvaluationAthletesById(
 
     const limitRaw = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
     const offsetRaw = Number.parseInt(url.searchParams.get("offset") ?? "", 10);
-    const limit = Number.isFinite(limitRaw)
-      ? Math.min(Math.max(limitRaw, 1), 200)
-      : 200;
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 200) : 200;
     const offset = Number.isFinite(offsetRaw) ? Math.max(offsetRaw, 0) : 0;
 
     const evaluation_id = (url.searchParams.get("evaluation_id") ?? "").trim();
@@ -531,9 +479,7 @@ export async function handleEvaluationImprovementSkills(
 
     const limitRaw = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
     const offsetRaw = Number.parseInt(url.searchParams.get("offset") ?? "", 10);
-    const limit = Number.isFinite(limitRaw)
-      ? Math.min(Math.max(limitRaw, 1), 200)
-      : 3;
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 200) : 3;
     const offset = Number.isFinite(offsetRaw) ? Math.max(offsetRaw, 0) : 0;
 
     const { data, count, error } = await listEvaluationImprovementSkills({
@@ -674,10 +620,7 @@ export async function handleEvaluationSubskillRatings(
         grouped.set(row.category_id, category);
       }
 
-      const score =
-        typeof row.rating === "number" && Number.isFinite(row.rating)
-          ? row.rating
-          : null;
+      const score = typeof row.rating === "number" && Number.isFinite(row.rating) ? row.rating : null;
       if (score === null) continue;
       if (!row.skill_id) continue;
 
@@ -780,9 +723,7 @@ export async function handleEvaluationWorkoutProgress(
 
     const limitRaw = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
     const offsetRaw = Number.parseInt(url.searchParams.get("offset") ?? "", 10);
-    const limit = Number.isFinite(limitRaw)
-      ? Math.min(Math.max(limitRaw, 1), 200)
-      : 200;
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 200) : 200;
     const offset = Number.isFinite(offsetRaw) ? Math.max(offsetRaw, 0) : 0;
 
     const { data, count, error } = await listEvaluationWorkoutProgress({
@@ -846,8 +787,7 @@ export async function handleIncrementWorkoutProgress(
     });
 
     if (error) {
-      const message =
-        error instanceof Error ? error.message : "Internal Server Error";
+      const message = error instanceof Error ? error.message : "Internal Server Error";
       if (message.toLowerCase().includes("not found")) {
         return jsonResponse({ ok: false, error: message }, { status: 404 });
       }
@@ -978,10 +918,7 @@ export async function handleEvaluationById(
   }
 
   if (!id) {
-    return jsonResponse(
-      { ok: false, error: "Missing 'id' path parameter" },
-      { status: 400 },
-    );
+    return jsonResponse({ ok: false, error: "Missing 'id' path parameter" }, { status: 400 });
   }
 
   try {
@@ -994,19 +931,13 @@ export async function handleEvaluationById(
     const evaluation: EvaluationDetailDto | null = await getEvaluationById(id, org_id);
 
     if (!evaluation) {
-      return jsonResponse(
-        { ok: false, error: "Evaluation not found" },
-        { status: 404 },
-      );
+      return jsonResponse({ ok: false, error: "Evaluation not found" }, { status: 404 });
     }
 
     return jsonResponse({ ok: true, evaluation }, { status: 200 });
   } catch (err) {
     console.error("[handleEvaluationById] Unexpected error", err);
-    return jsonResponse(
-      { ok: false, error: "Internal server error" },
-      { status: 500 },
-    );
+    return jsonResponse({ ok: false, error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -1036,10 +967,7 @@ export async function handleDeleteEvaluation(
     if (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.toLowerCase().includes("not found")) {
-        return jsonResponse(
-          { ok: false, error: "Evaluation not found" },
-          { status: 404 },
-        );
+        return jsonResponse({ ok: false, error: "Evaluation not found" }, { status: 404 });
       }
       console.error("[handleDeleteEvaluation] delete error", error);
       return internalError(error, "Failed to delete evaluation");
@@ -1064,35 +992,21 @@ export async function updateEvaluationMatrixController(
     const evaluationId = segments[segments.length - 2]; // ✅ UUID before "matrix"
 
     if (!evaluationId) {
-      return jsonResponse(
-        { ok: false, error: "Missing evaluation id in path" },
-        { status: 400 },
-      );
+      return jsonResponse({ ok: false, error: "Missing evaluation id in path" }, { status: 400 });
     }
 
-    const body = (await req.json().catch(() => null)) as
-      | EvaluationMatrixUpdateDto
-      | null;
+    const body = (await req.json().catch(() => null)) as EvaluationMatrixUpdateDto | null;
 
     if (!body || !Array.isArray(body.operations)) {
-      return jsonResponse(
-        { ok: false, error: "Body must include an 'operations' array" },
-        { status: 400 },
-      );
+      return jsonResponse({ ok: false, error: "Body must include an 'operations' array" }, { status: 400 });
     }
 
     if (!body.org_id || typeof body.org_id !== "string" || !RE_UUID.test(body.org_id)) {
-      return jsonResponse(
-        { ok: false, error: "org_id (UUID) is required" },
-        { status: 400 },
-      );
+      return jsonResponse({ ok: false, error: "org_id (UUID) is required" }, { status: 400 });
     }
 
     if (body.operations.length === 0) {
-      return jsonResponse(
-        { ok: false, error: "'operations' array must not be empty" },
-        { status: 400 },
-      );
+      return jsonResponse({ ok: false, error: "'operations' array must not be empty" }, { status: 400 });
     }
 
     const payload: EvaluationMatrixUpdateDto = {
@@ -1105,8 +1019,7 @@ export async function updateEvaluationMatrixController(
     return jsonResponse({ ok: true, evaluation }, { status: 200 });
   } catch (err: any) {
     console.error("[updateEvaluationMatrixController] error", err);
-    const message =
-      typeof err?.message === "string" ? err.message : "Internal server error";
+    const message = typeof err?.message === "string" ? err.message : "Internal server error";
     return jsonResponse({ ok: false, error: message }, { status: 500 });
   }
 }
@@ -1139,34 +1052,22 @@ export async function handleSubmitEvaluation(
     }
 
     if (!id) {
-      return jsonResponse(
-        { ok: false, error: "Missing 'id' path parameter" },
-        { status: 400 },
-      );
+      return jsonResponse({ ok: false, error: "Missing 'id' path parameter" }, { status: 400 });
     }
     if (!RE_UUID.test(id)) {
-      return jsonResponse(
-        { ok: false, error: "id (UUID) is required" },
-        { status: 400 },
-      );
+      return jsonResponse({ ok: false, error: "id (UUID) is required" }, { status: 400 });
     }
 
     const url = new URL(req.url);
     const org_id = (url.searchParams.get("org_id") ?? "").trim();
     if (!RE_UUID.test(org_id)) {
-      return jsonResponse(
-        { ok: false, error: "org_id (UUID) is required" },
-        { status: 400 },
-      );
+      return jsonResponse({ ok: false, error: "org_id (UUID) is required" }, { status: 400 });
     }
 
     const result = await submitEvaluation(id, org_id);
 
     if (!result.ok) {
-      const message =
-        result.error instanceof Error
-          ? result.error.message
-          : "Failed to submit evaluation";
+      const message = result.error instanceof Error ? result.error.message : "Failed to submit evaluation";
 
       if (message.toLowerCase().includes("not found")) {
         return jsonResponse({ ok: false, error: message }, { status: 404 });
@@ -1176,39 +1077,24 @@ export async function handleSubmitEvaluation(
     }
 
     try {
-      const { data: emailItems, error: emailError } =
-        await buildEvaluationReportEmailInputs(id, org_id);
+      const { data: emailItems, error: emailError } = await buildEvaluationReportEmailInputs(id, org_id);
 
       if (emailError) {
         console.error("[handleSubmitEvaluation] email build error", emailError);
       } else if (emailItems.length > 0) {
         const emailResult = await sendBulkEvaluationReportEmails(emailItems);
         if (emailResult.failed.length > 0) {
-          console.error(
-            "[handleSubmitEvaluation] email send failures",
-            emailResult.failed,
-          );
+          console.error("[handleSubmitEvaluation] email send failures", emailResult.failed);
         }
       }
     } catch (emailErr) {
       console.error("[handleSubmitEvaluation] email send error", emailErr);
     }
 
-    return jsonResponse(
-      { ok: true, data: result.data },
-      { status: 200 },
-    );
+    return jsonResponse({ ok: true, data: result.data }, { status: 200 });
   } catch (err) {
     console.error("[handleSubmitEvaluation] Unexpected error", err);
-    const message =
-      err instanceof Error
-        ? err.message
-        : typeof err === "string"
-        ? err
-        : "Internal server error";
-    return jsonResponse(
-      { ok: false, error: message },
-      { status: 500 },
-    );
+    const message = err instanceof Error ? err.message : typeof err === "string" ? err : "Internal server error";
+    return jsonResponse({ ok: false, error: message }, { status: 500 });
   }
 }

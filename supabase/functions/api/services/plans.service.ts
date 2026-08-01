@@ -57,16 +57,12 @@ function mapPlanItemRow(row: any): PlanItemDto {
   };
 }
 
-function buildPlanItemRows(
-  plan_id: string,
-  items: PlanItemInput[],
-  startIndex = 0,
-): Array<Record<string, unknown>> {
+function buildPlanItemRows(plan_id: string, items: PlanItemInput[], startIndex = 0): Array<Record<string, unknown>> {
   return items.map((item, index) => ({
     plan_id,
     section_title: item.section_title ?? null,
     section_order: item.section_order ?? null,
-    position: item.position ?? (startIndex + index),
+    position: item.position ?? startIndex + index,
     item_type: item.item_type ?? "drill",
     drill_id: item.drill_id ?? null,
     title: item.title ?? null,
@@ -124,10 +120,7 @@ export async function listInvitedPlans(
 
   const { data, error, count } = await client
     .from("practice_plans")
-    .select(
-      `${PLAN_SELECT}, practice_plan_members!inner(role, user_id, added_by, created_at)`,
-      { count: "exact" },
-    )
+    .select(`${PLAN_SELECT}, practice_plan_members!inner(role, user_id, added_by, created_at)`, { count: "exact" })
     .eq("org_id", org_id)
     .eq("practice_plan_members.user_id", user_id)
     .neq("owner_user_id", user_id)
@@ -138,9 +131,7 @@ export async function listInvitedPlans(
 
   const items = (data ?? []).map((row: any) => {
     const base = mapPlanRow(row);
-    const member = Array.isArray(row.practice_plan_members)
-      ? row.practice_plan_members[0]
-      : row.practice_plan_members;
+    const member = Array.isArray(row.practice_plan_members) ? row.practice_plan_members[0] : row.practice_plan_members;
 
     return {
       ...base,
@@ -210,9 +201,7 @@ export async function invitePlanMembers(
   if (coachError) return { data: null, error: coachError };
 
   const allowedSet = new Set(
-    [...(athleteRows ?? []), ...(coachRows ?? [])]
-      .map((row: any) => row.user_id)
-      .filter(Boolean),
+    [...(athleteRows ?? []), ...(coachRows ?? [])].map((row: any) => row.user_id).filter(Boolean),
   );
   const invalidIds = userIds.filter((id) => !allowedSet.has(id));
   if (invalidIds.length > 0) {
@@ -230,9 +219,7 @@ export async function invitePlanMembers(
 
   if (existingError) return { data: null, error: existingError };
 
-  const existingSet = new Set(
-    (existingRows ?? []).map((row: any) => row.user_id).filter(Boolean),
-  );
+  const existingSet = new Set((existingRows ?? []).map((row: any) => row.user_id).filter(Boolean));
   const toInvite = userIds.filter((id) => !existingSet.has(id));
   const skipped = userIds.filter((id) => existingSet.has(id));
 
@@ -271,9 +258,7 @@ export async function invitePlanMembers(
     };
   }
 
-  const invitedEmails = toInvite
-    .map((id) => emailByUserId.get(id))
-    .filter(Boolean) as string[];
+  const invitedEmails = toInvite.map((id) => emailByUserId.get(id)).filter(Boolean) as string[];
 
   const { data: pendingRows, error: pendingError } = await client
     .from("practice_plan_invitations")
@@ -284,9 +269,7 @@ export async function invitePlanMembers(
 
   if (pendingError) return { data: null, error: pendingError };
 
-  const pendingEmailSet = new Set(
-    (pendingRows ?? []).map((row: any) => row.invited_email).filter(Boolean),
-  );
+  const pendingEmailSet = new Set((pendingRows ?? []).map((row: any) => row.invited_email).filter(Boolean));
 
   const inviteRows = toInvite
     .map((user_id) => {
@@ -303,9 +286,7 @@ export async function invitePlanMembers(
     .filter(Boolean) as Array<Record<string, unknown>>;
 
   if (inviteRows.length > 0) {
-    const { error: inviteError } = await client
-      .from("practice_plan_invitations")
-      .insert(inviteRows);
+    const { error: inviteError } = await client.from("practice_plan_invitations").insert(inviteRows);
 
     if (inviteError) return { data: null, error: inviteError };
   }
@@ -317,9 +298,7 @@ export async function invitePlanMembers(
     added_by: invitedBy,
   }));
 
-  const { error: insertError } = await client
-    .from("practice_plan_members")
-    .insert(rows);
+  const { error: insertError } = await client.from("practice_plan_members").insert(rows);
 
   if (insertError) return { data: null, error: insertError };
 
@@ -423,9 +402,7 @@ export async function updatePlan(
 
   if (add_items.length > 0) {
     let startIndex = 0;
-    const needsPosition = add_items.some((item) =>
-      item.position === null || item.position === undefined
-    );
+    const needsPosition = add_items.some((item) => item.position === null || item.position === undefined);
 
     if (needsPosition) {
       const { data: lastRow, error: lastError } = await client
@@ -437,25 +414,19 @@ export async function updatePlan(
         .maybeSingle();
 
       if (lastError) return { data: null, error: lastError };
-      const lastPosition = typeof lastRow?.position === "number"
-        ? lastRow.position
-        : -1;
+      const lastPosition = typeof lastRow?.position === "number" ? lastRow.position : -1;
       startIndex = lastPosition + 1;
     }
 
     const rows = buildPlanItemRows(plan_id, add_items, startIndex);
-    const { error: addError } = await client
-      .from("practice_plan_items")
-      .insert(rows);
+    const { error: addError } = await client.from("practice_plan_items").insert(rows);
     if (addError) return { data: null, error: addError };
   }
 
   return { data: planRow ? mapPlanRow(planRow) : null, error: null };
 }
 
-export async function createPlan(
-  input: CreatePlanInput,
-): Promise<{ data: PlanDto | null; error: unknown }> {
+export async function createPlan(input: CreatePlanInput): Promise<{ data: PlanDto | null; error: unknown }> {
   const client = sbAdmin;
   if (!client) {
     return { data: null, error: new Error("Supabase client not initialized") };
@@ -474,11 +445,7 @@ export async function createPlan(
   if (input.visibility !== undefined) payload.visibility = input.visibility;
   if (input.status !== undefined) payload.status = input.status;
 
-  const { data, error } = await client
-    .from("practice_plans")
-    .insert(payload)
-    .select(PLAN_SELECT)
-    .single();
+  const { data, error } = await client.from("practice_plans").insert(payload).select(PLAN_SELECT).single();
 
   if (error) return { data: null, error };
 
@@ -495,9 +462,7 @@ export async function createPlan(
     return { data: null, error: new Error("items is required") };
   }
 
-  const { error: itemsError } = await client
-    .from("practice_plan_items")
-    .insert(rows);
+  const { error: itemsError } = await client.from("practice_plan_items").insert(rows);
 
   if (itemsError) {
     await client.from("practice_plans").delete().eq("id", plan.id);
@@ -507,9 +472,7 @@ export async function createPlan(
   return { data: plan, error: null };
 }
 
-export async function getPlanAccess(
-  plan_id: string,
-): Promise<{
+export async function getPlanAccess(plan_id: string): Promise<{
   data: { org_id: string | null; owner_user_id: string } | null;
   error: unknown;
 }> {
@@ -536,10 +499,7 @@ export async function getPlanAccess(
   };
 }
 
-export async function isPlanMember(
-  plan_id: string,
-  user_id: string,
-): Promise<{ data: boolean; error: unknown }> {
+export async function isPlanMember(plan_id: string, user_id: string): Promise<{ data: boolean; error: unknown }> {
   const client = sbAdmin;
   if (!client) {
     return { data: false, error: new Error("Supabase client not initialized") };

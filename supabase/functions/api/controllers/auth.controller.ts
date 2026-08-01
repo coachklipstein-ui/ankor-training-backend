@@ -11,7 +11,6 @@ import {
   type EvaluationReportEmailInput,
 } from "../services/email.service.ts";
 
-
 export async function handleAuthSignup(req: Request, origin: string | null) {
   if (req.method !== "POST") return badRequest("Use POST", origin);
 
@@ -22,9 +21,7 @@ export async function handleAuthSignup(req: Request, origin: string | null) {
     return badRequest(msg, origin);
   }
   const base = parsed.data as any; // athlete | coach | parent
-  const positionId = base.role === "athlete" && typeof base.position_id === "string"
-    ? base.position_id.trim()
-    : "";
+  const positionId = base.role === "athlete" && typeof base.position_id === "string" ? base.position_id.trim() : "";
 
   // Create auth user
   const { data: created, error: createErr } = await sbAdmin!.auth.admin.createUser({
@@ -36,9 +33,7 @@ export async function handleAuthSignup(req: Request, origin: string | null) {
       username: base.username ?? null,
       cell_number: base.cellNumber ?? null,
       join_code: base.joinCode,
-      ...(base.role === "athlete"
-        ? { graduation_year: base.graduationYear, position_id: positionId || null }
-        : {}),
+      ...(base.role === "athlete" ? { graduation_year: base.graduationYear, position_id: positionId || null } : {}),
     },
     app_metadata: { role: base.role },
     email_confirm: true,
@@ -99,12 +94,12 @@ export async function handleAuthSignup(req: Request, origin: string | null) {
 
     if (txErr) throw txErr;
 
-    const out = (Array.isArray(txData) && txData[0]) ? txData[0] : {};
+    const out = Array.isArray(txData) && txData[0] ? txData[0] : {};
 
     try {
-      const fullName = [base.firstName, base.lastName].filter((part) =>
-        typeof part === "string" && part.trim().length > 0
-      ).join(" ");
+      const fullName = [base.firstName, base.lastName]
+        .filter((part) => typeof part === "string" && part.trim().length > 0)
+        .join(" ");
       const { actionLink } = await generateMagicLink(base.email, {
         data: { role: base.role, user_id: userId },
       });
@@ -140,10 +135,13 @@ export async function handleAuthLogin(req: Request, origin: string | null) {
 
   const body = payload as Record<string, unknown>;
   const userIdRaw =
-    typeof body.user_id === "string" ? body.user_id :
-    typeof body.userId === "string" ? body.userId :
-    typeof body.userid === "string" ? body.userid :
-    "";
+    typeof body.user_id === "string"
+      ? body.user_id
+      : typeof body.userId === "string"
+        ? body.userId
+        : typeof body.userid === "string"
+          ? body.userid
+          : "";
   const parsed = AuthLoginSchema.safeParse({ user_id: userIdRaw.trim() });
   if (!parsed.success) {
     const msg = parsed.error.issues.map((i) => i.message).join("; ");
@@ -184,9 +182,7 @@ export async function handleAuthLogin(req: Request, origin: string | null) {
   if (!profile) return notFound("Profile not found", origin);
 
   const profileUserId = typeof profile.id === "string" ? profile.id.trim() : "";
-  const profileOrgId = typeof profile.default_org_id === "string"
-    ? profile.default_org_id.trim()
-    : "";
+  const profileOrgId = typeof profile.default_org_id === "string" ? profile.default_org_id.trim() : "";
   let effectiveRole = profile.role ?? null;
 
   if (profileOrgId && profileUserId && effectiveRole !== "parent") {
@@ -248,18 +244,21 @@ export async function handleAuthLogin(req: Request, origin: string | null) {
     athlete_id = athleteRow?.id ?? null;
   }
 
-  return json({
-    ok: true,
-    user: {
-      id: profile.id,
-      full_name: profile.full_name ?? null,
-      email: profile.email,
-      role: effectiveRole,
-      default_org_id: profile.default_org_id ?? null,
-      coach_id,
-      athlete_id,
+  return json(
+    {
+      ok: true,
+      user: {
+        id: profile.id,
+        full_name: profile.full_name ?? null,
+        email: profile.email,
+        role: effectiveRole,
+        default_org_id: profile.default_org_id ?? null,
+        coach_id,
+        athlete_id,
+      },
     },
-  }, origin);
+    origin,
+  );
 }
 
 function readStringField(body: Record<string, unknown>, ...keys: string[]): string {
@@ -312,7 +311,7 @@ export async function handleTestWelcomeEmail(
       const dataValue = body.data;
       const data =
         dataValue && typeof dataValue === "object" && !Array.isArray(dataValue)
-          ? dataValue as Record<string, unknown>
+          ? (dataValue as Record<string, unknown>)
           : undefined;
 
       if (linkType === "invite") {
@@ -368,13 +367,10 @@ export async function handleTestBulkEvaluationReportEmails(
   const appName = readStringField(body, "appName") || undefined;
 
   try {
-    const result = await sendBulkEvaluationReportEmails(
-      itemsRaw as EvaluationReportEmailInput[],
-      {
-        subject,
-        appName,
-      },
-    );
+    const result = await sendBulkEvaluationReportEmails(itemsRaw as EvaluationReportEmailInput[], {
+      subject,
+      appName,
+    });
     return json({ ok: true, result }, origin);
   } catch (err) {
     console.error("[handleTestBulkEvaluationReportEmails] failed", err);
@@ -382,4 +378,3 @@ export async function handleTestBulkEvaluationReportEmails(
     return serverError(`Failed to send evaluation report emails: ${message}`, origin);
   }
 }
-

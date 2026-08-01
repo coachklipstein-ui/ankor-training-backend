@@ -3,8 +3,7 @@
 // Common CORS headers for Supabase Edge Functions
 export const corsHeaders: HeadersInit = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 // Helper to build a JSON Response with CORS
@@ -63,9 +62,7 @@ export function notFound(message = "Not found"): Response {
   });
 }
 
-export function methodNotAllowed(
-  allowed: string[] = ["GET", "POST"],
-): Response {
+export function methodNotAllowed(allowed: string[] = ["GET", "POST"]): Response {
   return json(405, {
     ok: false,
     error: `Method not allowed. Allowed: ${allowed.join(", ")}`,

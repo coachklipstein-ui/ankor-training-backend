@@ -35,11 +35,7 @@ function normalizePath(path: string): string {
   return path.replace(/^\/+|\/+$/g, ""); // trim leading/trailing slashes
 }
 
-function matchPath(
-  routePath: string,
-  requestPath: string,
-  params: RouteParams,
-): boolean {
+function matchPath(routePath: string, requestPath: string, params: RouteParams): boolean {
   const routeSegments = normalizePath(routePath).split("/").filter(Boolean);
   const requestSegments = normalizePath(requestPath).split("/").filter(Boolean);
 
@@ -84,9 +80,7 @@ export class Router {
     const base = normalizePath(prefix);
 
     for (const r of child.getRoutes()) {
-      const combinedPath = r.path
-        ? `${base}/${r.path}`.replace(/\/+/g, "/")
-        : base;
+      const combinedPath = r.path ? `${base}/${r.path}`.replace(/\/+/g, "/") : base;
       const combinedMiddlewares = [...middlewares, ...r.middlewares];
 
       this.routes.push({
@@ -102,12 +96,7 @@ export class Router {
     return [...this.routes];
   }
 
-  async handle(
-    method: string,
-    path: string,
-    req: Request,
-    origin: string | null,
-  ): Promise<Response | null> {
+  async handle(method: string, path: string, req: Request, origin: string | null): Promise<Response | null> {
     const normalizedPath = normalizePath(path);
     const upperMethod = method.toUpperCase();
 

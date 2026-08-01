@@ -1,11 +1,6 @@
 import { sbAdmin } from "./supabase.ts";
 import { generateMagicLink, sendWelcomeEmail } from "./email.service.ts";
-import type {
-  CoachDto,
-  CoachListFilterInput,
-  CreateCoachInput,
-  UpdateCoachInput,
-} from "../dtos/coaches.dto.ts";
+import type { CoachDto, CoachListFilterInput, CreateCoachInput, UpdateCoachInput } from "../dtos/coaches.dto.ts";
 
 function buildFullName(first?: string | null, last?: string | null): string | null {
   const parts = [first?.trim(), last?.trim()].filter((part) => part && part.length > 0) as string[];
@@ -104,9 +99,7 @@ export async function getCoachById(
   return { data: data ? mapCoachRow(data) : null, error: null };
 }
 
-export async function createCoach(
-  input: CreateCoachInput,
-): Promise<{ data: CoachDto | null; error: unknown }> {
+export async function createCoach(input: CreateCoachInput): Promise<{ data: CoachDto | null; error: unknown }> {
   const client = sbAdmin;
   if (!client) {
     return { data: null, error: new Error("Supabase client not initialized") };
@@ -154,8 +147,8 @@ export async function createCoach(
     typeof txData === "string"
       ? txData
       : Array.isArray(txData)
-      ? txData[0]?.coach_id ?? null
-      : (txData as any)?.coach_id ?? null;
+        ? (txData[0]?.coach_id ?? null)
+        : ((txData as any)?.coach_id ?? null);
 
   if (!coachId) {
     await client.auth.admin.deleteUser(userId).catch(() => {});
@@ -165,11 +158,7 @@ export async function createCoach(
   const coachResult = await getCoachById(coachId, input.org_id);
   if (coachResult.error || !coachResult.data) {
     try {
-      await client
-        .from("coaches")
-        .delete()
-        .eq("id", coachId)
-        .eq("org_id", input.org_id);
+      await client.from("coaches").delete().eq("id", coachId).eq("org_id", input.org_id);
     } catch {
       // ignore cleanup failure
     }
@@ -221,11 +210,7 @@ export async function updateCoach(
       return { data: null, error: new Error("Coach not found") };
     }
   } else {
-    const { data, error } = await client
-      .from("coaches")
-      .select("id")
-      .eq("id", coach_id)
-      .eq("org_id", org_id);
+    const { data, error } = await client.from("coaches").select("id").eq("id", coach_id).eq("org_id", org_id);
 
     if (error) return { data: null, error };
     if (!data || data.length === 0) {
@@ -245,12 +230,7 @@ export async function deleteCoach(
     return { data: null, error: new Error("Supabase client not initialized") };
   }
 
-  const { data, error } = await client
-    .from("coaches")
-    .delete()
-    .eq("id", coach_id)
-    .eq("org_id", org_id)
-    .select("id");
+  const { data, error } = await client.from("coaches").delete().eq("id", coach_id).eq("org_id", org_id).select("id");
 
   if (error) return { data: null, error };
   if (!data || data.length === 0) {
@@ -283,7 +263,7 @@ export async function getCoachSummary(
 
   if (error) return { data: null, error };
 
-  const row = Array.isArray(data) ? data[0] ?? null : data ?? null;
+  const row = Array.isArray(data) ? (data[0] ?? null) : (data ?? null);
   const toNumber = (value: unknown): number => {
     const num = Number(value);
     return Number.isFinite(num) ? num : 0;

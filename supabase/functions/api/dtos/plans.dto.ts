@@ -96,15 +96,15 @@ export const UpdatePlanSchema = z
     remove_item_ids: z.array(uuid()).optional().default([]),
   })
   .superRefine((value, ctx) => {
-    const hasPlanPatch = value.name !== undefined ||
+    const hasPlanPatch =
+      value.name !== undefined ||
       value.description !== undefined ||
       value.visibility !== undefined ||
       value.status !== undefined ||
       value.tags !== undefined ||
       value.estimated_minutes !== undefined ||
       value.org_id !== undefined;
-    const hasItemOps =
-      (value.add_items?.length ?? 0) > 0 || (value.remove_item_ids?.length ?? 0) > 0;
+    const hasItemOps = (value.add_items?.length ?? 0) > 0 || (value.remove_item_ids?.length ?? 0) > 0;
 
     if (!hasPlanPatch && !hasItemOps) {
       ctx.addIssue({

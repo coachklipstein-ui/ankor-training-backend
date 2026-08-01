@@ -15,7 +15,7 @@ import { createAuthRouter } from "./routes/auth.router.ts";
 import { createOrgRouter } from "./routes/org.router.ts";
 import { createSkillsRouter } from "./routes/skills.router.ts";
 import { createEvaluationsRouter } from "./routes/evaluations.router.ts";
-import { createTeamsRouter } from "./routes/teams.router.ts"; 
+import { createTeamsRouter } from "./routes/teams.router.ts";
 import { createCoachesRouter } from "./routes/coaches.router.ts";
 import { createAthletesRouter } from "./routes/athletes.router.ts";
 import { createGuardiansRouter } from "./routes/guardians.router.ts";
@@ -36,7 +36,7 @@ router.use("auth", createAuthRouter());
 router.use("org", createOrgRouter());
 router.use("scorecard", createScorecardsRouter(), [requireAuth]);
 router.use("skills", createSkillsRouter(), [requireAuth]);
-router.use("teams", createTeamsRouter(), [requireAuth]); 
+router.use("teams", createTeamsRouter(), [requireAuth]);
 router.use("athletes", createAthletesRouter(), [requireAuth]);
 router.use("coaches", createCoachesRouter(), [requireAuth]);
 router.use("guardians", createGuardiansRouter(), [requireAuth]);
@@ -69,9 +69,6 @@ Deno.serve(async (req) => {
     const res = await router.handle(req.method, subpath, req, origin);
     return res ?? notFound(`Not found: ${req.method} /${subpath || ""}`, origin);
   } catch (err) {
-    return serverError(
-      `Unexpected error: ${(err as Error)?.message ?? String(err)}`,
-      origin,
-    );
+    return serverError(`Unexpected error: ${(err as Error)?.message ?? String(err)}`, origin);
   }
 });

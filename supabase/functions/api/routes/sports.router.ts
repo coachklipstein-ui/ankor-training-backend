@@ -5,11 +5,7 @@ export function createSportsRouter(): Router {
   const router = new Router();
 
   // GET /api/sports/list
-  router.add(
-    "GET",
-    "list",
-    handleSportsList,
-  );
+  router.add("GET", "list", handleSportsList);
 
   return router;
 }

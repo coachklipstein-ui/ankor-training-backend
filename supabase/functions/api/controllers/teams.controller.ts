@@ -8,20 +8,8 @@ import {
   listTeamsWithAthletes,
   updateTeam,
 } from "../services/teams.service.ts";
-import {
-  badRequest,
-  created,
-  internalError,
-  json,
-  methodNotAllowed,
-  notFound,
-} from "../utils/http.ts";
-import {
-  CreateTeamSchema,
-  GetTeamByIdSchema,
-  UpdateTeamSchema,
-  type TeamDTO,
-} from "../dtos/team.dto.ts";
+import { badRequest, created, internalError, json, methodNotAllowed, notFound } from "../utils/http.ts";
+import { CreateTeamSchema, GetTeamByIdSchema, UpdateTeamSchema, type TeamDTO } from "../dtos/team.dto.ts";
 import type { RequestContext } from "../routes/router.ts";
 import { RE_UUID } from "../utils/uuid.ts";
 
@@ -80,7 +68,6 @@ export async function handleTeamsWithAthletesList(
     return internalError(err);
   }
 }
-
 
 export async function getTeamsController(
   req: Request,

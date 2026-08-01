@@ -6,11 +6,7 @@ export function createPositionsRouter(): Router {
   const router = new Router();
 
   // GET /api/positions/list
-  router.add(
-    "GET",
-    "list",
-    handlePositionsList,
-  );
+  router.add("GET", "list", handlePositionsList);
 
   return router;
 }

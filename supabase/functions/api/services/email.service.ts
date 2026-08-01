@@ -58,7 +58,7 @@ function escapeHtml(input: string): string {
         return "&lt;";
       case ">":
         return "&gt;";
-      case "\"":
+      case '"':
         return "&quot;";
       case "'":
         return "&#39;";
@@ -81,14 +81,8 @@ type NormalizedEvaluationReportPayload = {
   evaluationLink: string;
 };
 
-function readReportValue(
-  item: EvaluationReportEmailInput,
-  key: string,
-): string {
-  const values =
-    item && typeof item === "object"
-      ? (item as Record<string, unknown>)
-      : {};
+function readReportValue(item: EvaluationReportEmailInput, key: string): string {
+  const values = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
   const value = values[key];
   if (typeof value === "string") return value.trim();
   return "";
@@ -98,38 +92,17 @@ function normalizeEvaluationReportPayload(
   item: EvaluationReportEmailInput,
   defaults: { from: string; subject: string; appName: string },
 ): NormalizedEvaluationReportPayload {
-  const to = requireValue(
-    typeof item?.to === "string" ? item.to : "",
-    "to",
-  );
+  const to = requireValue(typeof item?.to === "string" ? item.to : "", "to");
 
   const athleteFirstNameRaw = readReportValue(item, "athleteFirstName");
   const athleteFirstName = athleteFirstNameRaw || "there";
 
-  const coachName = requireValue(
-    readReportValue(item, "coachName"),
-    "coachName",
-  );
-  const appName = requireValue(
-    readReportValue(item, "appName") || defaults.appName,
-    "appName",
-  );
-  const evaluationTitle = requireValue(
-    readReportValue(item, "evaluationTitle"),
-    "evaluationTitle",
-  );
-  const evaluationDate = requireValue(
-    readReportValue(item, "evaluationDate"),
-    "evaluationDate",
-  );
-  const teamOrOrgName = requireValue(
-    readReportValue(item, "teamOrOrgName"),
-    "teamOrOrgName",
-  );
-  const evaluationLink = requireValue(
-    readReportValue(item, "evaluationLink"),
-    "evaluationLink",
-  );
+  const coachName = requireValue(readReportValue(item, "coachName"), "coachName");
+  const appName = requireValue(readReportValue(item, "appName") || defaults.appName, "appName");
+  const evaluationTitle = requireValue(readReportValue(item, "evaluationTitle"), "evaluationTitle");
+  const evaluationDate = requireValue(readReportValue(item, "evaluationDate"), "evaluationDate");
+  const teamOrOrgName = requireValue(readReportValue(item, "teamOrOrgName"), "teamOrOrgName");
+  const evaluationLink = requireValue(readReportValue(item, "evaluationLink"), "evaluationLink");
 
   const from = requireValue(defaults.from, "RESEND_FROM");
   const subjectRaw = typeof item.subject === "string" ? item.subject.trim() : "";
@@ -241,10 +214,7 @@ export async function generateAuthLink(
     throw error;
   }
 
-  const actionLink =
-    (data as any)?.properties?.action_link ??
-    (data as any)?.action_link ??
-    "";
+  const actionLink = (data as any)?.properties?.action_link ?? (data as any)?.action_link ?? "";
 
   if (!actionLink) {
     throw new Error("Auth link was not returned by Supabase");
@@ -324,11 +294,8 @@ export async function sendBulkEvaluationReportEmails(
 
   const apiKey = requireValue(RESEND_API_KEY, "RESEND_API_KEY");
   const defaultFrom = requireValue(RESEND_FROM, "RESEND_FROM");
-  const defaultSubject =
-    (options.subject ?? "New evaluation available").trim() ||
-    "New evaluation available";
-  const defaultAppName =
-    (options.appName ?? "ANKOR").trim() || "ANKOR";
+  const defaultSubject = (options.subject ?? "New evaluation available").trim() || "New evaluation available";
+  const defaultAppName = (options.appName ?? "ANKOR").trim() || "ANKOR";
 
   const results = await Promise.all(
     items.map(async (item) => {
@@ -384,16 +351,14 @@ export async function sendBulkEvaluationReportEmails(
   };
 }
 
-export async function inviteUserAndSendWelcome(
-  params: {
-    email: string;
-    fullName?: string | null;
-    redirectTo?: string;
-    data?: Record<string, unknown>;
-    from?: string;
-    subject?: string;
-  },
-): Promise<{ actionLink: string; userId: string | null }> {
+export async function inviteUserAndSendWelcome(params: {
+  email: string;
+  fullName?: string | null;
+  redirectTo?: string;
+  data?: Record<string, unknown>;
+  from?: string;
+  subject?: string;
+}): Promise<{ actionLink: string; userId: string | null }> {
   const { email, fullName, redirectTo, data, from, subject } = params;
   const { actionLink, userId } = await generateInviteLink(email, {
     redirectTo,

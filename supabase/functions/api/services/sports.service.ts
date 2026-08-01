@@ -12,10 +12,7 @@ export async function listSports(): Promise<{ data: Sport[]; error: unknown }> {
     return { data: [], error: new Error("Supabase client not initialized") };
   }
 
-  const { data, error } = await client
-    .from("sports")
-    .select("id, code, name")
-    .order("name", { ascending: true });
+  const { data, error } = await client.from("sports").select("id, code, name").order("name", { ascending: true });
 
   if (error) {
     return { data: [], error };

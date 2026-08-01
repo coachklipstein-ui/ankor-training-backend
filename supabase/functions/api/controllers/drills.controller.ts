@@ -39,10 +39,7 @@ function qp(url: URL, key: string): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-function parseCommaList(
-  value: string | null,
-  validator: (s: string) => boolean,
-): string[] {
+function parseCommaList(value: string | null, validator: (s: string) => boolean): string[] {
   if (!value) return [];
   return value
     .split(",")
@@ -110,8 +107,7 @@ export async function createDrillController(
     return internalError(error, "Failed to create drill");
   }
 
-  const drill =
-    Array.isArray(data) && data.length === 1 ? data[0] : data ?? null;
+  const drill = Array.isArray(data) && data.length === 1 ? data[0] : (data ?? null);
 
   return created({ ok: true, drill });
 }
@@ -136,16 +132,12 @@ export async function listDrillsController(
     org_id,
     name: (url.searchParams.get("name") ?? "").trim() || undefined,
     levels: parseCommaList(url.searchParams.get("levels"), (s) => s.length > 0),
-    segment_ids: parseCommaList(url.searchParams.get("segment_ids"), (s) =>
-      RE_UUID.test(s)
-    ),
+    segment_ids: parseCommaList(url.searchParams.get("segment_ids"), (s) => RE_UUID.test(s)),
     min_age: url.searchParams.get("min_age"),
     max_age: url.searchParams.get("max_age"),
     min_players: url.searchParams.get("min_players"),
     max_players: url.searchParams.get("max_players"),
-    skill_tag_ids: parseCommaList(url.searchParams.get("skill_tags"), (s) =>
-      RE_UUID.test(s)
-    ),
+    skill_tag_ids: parseCommaList(url.searchParams.get("skill_tags"), (s) => RE_UUID.test(s)),
     limit: qp(url, "limit"),
     offset: qp(url, "offset"),
   };
@@ -210,9 +202,7 @@ export async function listDrillTagsController(
   const q = (url.searchParams.get("q") ?? "").trim();
   const rawLimit = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
   const rawOffset = Number.parseInt(url.searchParams.get("offset") ?? "", 10);
-  const limit = Number.isFinite(rawLimit)
-    ? Math.min(Math.max(rawLimit, 1), 200)
-    : undefined;
+  const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 200) : undefined;
   const offset = Number.isFinite(rawOffset) ? Math.max(rawOffset, 0) : undefined;
 
   const { data, count, error } = await listDrillTags({
@@ -237,18 +227,14 @@ export async function getDrillByIdController(
   params?: { id?: string },
   ctx?: RequestContext,
 ): Promise<Response> {
-  
   if (req.method !== "GET") {
     return methodNotAllowed(["GET"]);
   }
 
-  const drill_id =  params?.id;
+  const drill_id = params?.id;
 
   if (!drill_id) {
-        return jsonResponse(
-          { ok: false, error: "Missing 'id' path parameter" },
-          { status: 400 },
-        );
+    return jsonResponse({ ok: false, error: "Missing 'id' path parameter" }, { status: 400 });
   }
 
   const parsed = GetDrillByIdSchema.safeParse({ drill_id });
@@ -289,10 +275,7 @@ export async function updateDrillController(
 
   const drill_id = params?.id;
   if (!drill_id) {
-    return jsonResponse(
-      { ok: false, error: "Missing 'id' path parameter" },
-      { status: 400 },
-    );
+    return jsonResponse({ ok: false, error: "Missing 'id' path parameter" }, { status: 400 });
   }
 
   const idParsed = GetDrillByIdSchema.safeParse({ drill_id });
@@ -314,8 +297,7 @@ export async function updateDrillController(
 
   const { add_tag_ids, remove_tag_ids, ...rest } = parsed.data;
   const hasPatch = Object.values(rest).some((value) => value !== undefined);
-  const hasTagOps =
-    (add_tag_ids?.length ?? 0) > 0 || (remove_tag_ids?.length ?? 0) > 0;
+  const hasTagOps = (add_tag_ids?.length ?? 0) > 0 || (remove_tag_ids?.length ?? 0) > 0;
 
   if (!hasPatch && !hasTagOps) {
     return badRequest("No updates provided");
@@ -349,10 +331,7 @@ export async function getDrillMediaPlaybackController(
 
   const drill_id = params?.drill_id;
   if (!drill_id) {
-    return jsonResponse(
-      { ok: false, error: "Missing 'drill_id' path parameter" },
-      { status: 400 },
-    );
+    return jsonResponse({ ok: false, error: "Missing 'drill_id' path parameter" }, { status: 400 });
   }
 
   const parsed = GetDrillByIdSchema.safeParse({ drill_id });
@@ -364,14 +343,9 @@ export async function getDrillMediaPlaybackController(
   const url = new URL(req.url);
   const rawExpires = url.searchParams.get("expires_in");
   const parsedExpires = rawExpires ? Number.parseInt(rawExpires, 10) : NaN;
-  const expires_in = Number.isFinite(parsedExpires)
-    ? Math.min(Math.max(parsedExpires, 60), 60 * 60 * 24)
-    : 60 * 60;
+  const expires_in = Number.isFinite(parsedExpires) ? Math.min(Math.max(parsedExpires, 60), 60 * 60 * 24) : 60 * 60;
 
-  const { data, error } = await getDrillMediaPlaybackUrl(
-    parsed.data.drill_id,
-    expires_in,
-  );
+  const { data, error } = await getDrillMediaPlaybackUrl(parsed.data.drill_id, expires_in);
 
   if (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -415,9 +389,7 @@ export async function createDrillMediaUploadUrlController(
   }
 
   if (!isUploadContentTypeValid(parsed.data.type, parsed.data.content_type)) {
-    return badRequest(
-      `content_type does not match media type '${parsed.data.type}'`,
-    );
+    return badRequest(`content_type does not match media type '${parsed.data.type}'`);
   }
 
   const { data, error } = await createDrillMediaUploadUrl(parsed.data);

@@ -1,19 +1,10 @@
 import { sbAdmin } from "./supabase.ts";
-import {
-  EvaluationInput,
-  EvaluationWithItems,
-} from "../schemas/evaluations.ts";
-import {
-  EvaluationDetailDto,
-   type EvaluationMatrixUpdateDto,
-  toEvaluationDetailDto,
-} from "../dtos/evaluations.dto.ts";
+import { EvaluationInput, EvaluationWithItems } from "../schemas/evaluations.ts";
+import { EvaluationDetailDto, type EvaluationMatrixUpdateDto, toEvaluationDetailDto } from "../dtos/evaluations.dto.ts";
 import { INVITE_REDIRECT_URL } from "../config/env.ts";
 import type { EvaluationReportEmailInput } from "./email.service.ts";
 
-type SubmitEvaluationResult =
-  | { ok: true; data: { id: string; status: string } }
-  | { ok: false; error: unknown };
+type SubmitEvaluationResult = { ok: true; data: { id: string; status: string } } | { ok: false; error: unknown };
 
 export type LatestEvaluationRow = {
   evaluation_id: string;
@@ -155,10 +146,7 @@ function storageObjectPathFromUrl(value: unknown): string | null {
   const prefix = "/storage/v1/object/";
   if (!url.pathname.startsWith(prefix)) return null;
 
-  const parts = url.pathname
-    .slice(prefix.length)
-    .split("/")
-    .filter(Boolean);
+  const parts = url.pathname.slice(prefix.length).split("/").filter(Boolean);
   const offset = parts[0] === "public" || parts[0] === "sign" ? 1 : 0;
   if (parts.length - offset < 2) return null;
 
@@ -190,21 +178,17 @@ export type EvaluationWorkoutDrillLevel = {
   drills: EvaluationWorkoutDrillVideo[];
 };
 
-
 export async function rpcBulkCreateEvaluations(args: {
   evaluations: EvaluationInput[];
 }): Promise<{ data: EvaluationWithItems[] | null; error: unknown }> {
-  const { data, error } = await sbAdmin!.rpc(
-    "evaluations_bulk_create_tx",
-    args,
-  );
+  const { data, error } = await sbAdmin!.rpc("evaluations_bulk_create_tx", args);
 
   if (error) {
     return { data: null, error };
   }
 
-  const mapped: EvaluationWithItems[] | null = (data as any[] | null)?.map(
-    (row: any) => {
+  const mapped: EvaluationWithItems[] | null =
+    (data as any[] | null)?.map((row: any) => {
       const {
         template_id,
         teams_id,
@@ -231,8 +215,7 @@ export async function rpcBulkCreateEvaluations(args: {
         team_id: teams_id,
         evaluation_items: mappedItems,
       } as EvaluationWithItems;
-    },
-  ) ?? null;
+    }) ?? null;
 
   return {
     data: mapped,
@@ -240,13 +223,12 @@ export async function rpcBulkCreateEvaluations(args: {
   };
 }
 
-
 export async function listEvaluations(org_id?: string): Promise<{
   data: any[] | null;
   error: unknown;
 }> {
   let query = sbAdmin!
-    .from('evaluations')
+    .from("evaluations")
     .select(
       `
       id,
@@ -267,37 +249,37 @@ export async function listEvaluations(org_id?: string): Promise<{
       )
     `,
     )
-    .neq('status', 'completed')
-    .order('created_at', { ascending: false })
+    .neq("status", "completed")
+    .order("created_at", { ascending: false });
 
   if (org_id) {
-    query = query.eq('org_id', org_id)
+    query = query.eq("org_id", org_id);
   }
 
-  const { data, error } = await query
+  const { data, error } = await query;
 
   if (error) {
-    return { data: null, error }
+    return { data: null, error };
   }
 
   const mapped = (data ?? []).map((row: any) => {
-  const { template_id, team, template, ...rest } = row
+    const { template_id, team, template, ...rest } = row;
 
     // ---- team name ----
-  const team_name: string | null = team?.name ?? null
+    const team_name: string | null = team?.name ?? null;
 
     // ---- template name ----
-  const scorecard_template_name: string | null = template?.name ?? null
+    const scorecard_template_name: string | null = template?.name ?? null;
 
-  return {
+    return {
       ...rest,
       scorecard_template_id: template_id,
       scorecard_template_name,
       team_name,
-    }
-  })
+    };
+  });
 
-  return { data: mapped, error: null }
+  return { data: mapped, error: null };
 }
 
 export async function listLatestEvaluationsByAthlete(
@@ -322,7 +304,7 @@ export async function listLatestEvaluationsByAthlete(
     date_to,
   } = filters;
 
-   let query = client
+  let query = client
     .from("evaluation_items")
     .select(
       `
@@ -412,15 +394,12 @@ export async function listLatestEvaluationsByAthlete(
     query = query.lte("evaluations.created_at", date_to);
   }
 
-
   const { data, error } = await query;
   if (error) {
     return { data: [], count: 0, error };
   }
 
-  const scorecardQuery = scorecard_name
-    ? scorecard_name.toLowerCase()
-    : null;
+  const scorecardQuery = scorecard_name ? scorecard_name.toLowerCase() : null;
   const grouped = new Map<string, LatestEvaluationRow>();
 
   for (const row of data ?? []) {
@@ -513,9 +492,7 @@ export async function listEvaluationAthletesById(
     return { data: [], count: 0, error: null };
   }
 
-  const scopedRows = (data ?? []).filter(
-    (row: any) => row?.evaluation?.org_id === org_id,
-  );
+  const scopedRows = (data ?? []).filter((row: any) => row?.evaluation?.org_id === org_id);
   if (scopedRows.length === 0) {
     return { data: [], count: 0, error: null };
   }
@@ -598,8 +575,8 @@ export async function listEvaluationImprovementSkills(
     const items = Array.isArray(row?.evaluation_items)
       ? row.evaluation_items
       : row?.evaluation_items
-      ? [row.evaluation_items]
-      : [];
+        ? [row.evaluation_items]
+        : [];
 
     for (const item of items) {
       const subskillId = item?.subskill_id;
@@ -617,9 +594,7 @@ export async function listEvaluationImprovementSkills(
     return { data: [], count: 0, error: null };
   }
 
-  const skillIds = Array.from(
-    new Set(rawItems.map((item) => item.subskill_id).filter(Boolean)),
-  );
+  const skillIds = Array.from(new Set(rawItems.map((item) => item.subskill_id).filter(Boolean)));
   if (skillIds.length === 0) {
     return { data: [], count: 0, error: null };
   }
@@ -710,13 +685,12 @@ export async function listEvaluationSkillVideos(
 
   const { org_id, evaluation_id, athlete_id, rating_max } = filters;
 
-  const { data, error } = await client
-    .rpc("list_evaluation_skill_videos", {
-      p_evaluation_id: evaluation_id,
-      p_org_id: org_id,
-      p_athlete_id: athlete_id,
-      p_rating_max: rating_max,
-    });
+  const { data, error } = await client.rpc("list_evaluation_skill_videos", {
+    p_evaluation_id: evaluation_id,
+    p_org_id: org_id,
+    p_athlete_id: athlete_id,
+    p_rating_max: rating_max,
+  });
 
   if (error) {
     return { data: [], count: 0, error };
@@ -726,12 +700,8 @@ export async function listEvaluationSkillVideos(
   for (const row of data ?? []) {
     const skillId = row?.skill_id;
     if (typeof skillId !== "string" || !skillId) continue;
-    const url = typeof row?.url === "string" && row.url.trim()
-      ? row.url.trim()
-      : null;
-    const rating = row?.rating === null || row?.rating === undefined
-      ? null
-      : Number(row.rating);
+    const url = typeof row?.url === "string" && row.url.trim() ? row.url.trim() : null;
+    const rating = row?.rating === null || row?.rating === undefined ? null : Number(row.rating);
 
     results.push({
       evaluation_id: row?.evaluation_id ?? evaluation_id,
@@ -804,8 +774,8 @@ export async function listEvaluationSubskillRatings(
     const categories = Array.isArray(template?.scorecard_categories)
       ? template.scorecard_categories
       : template?.scorecard_categories
-      ? [template.scorecard_categories]
-      : [];
+        ? [template.scorecard_categories]
+        : [];
 
     for (const category of categories) {
       const categoryId = category?.id;
@@ -817,8 +787,8 @@ export async function listEvaluationSubskillRatings(
       const subskills = Array.isArray(category?.scorecard_subskills)
         ? category.scorecard_subskills
         : category?.scorecard_subskills
-        ? [category.scorecard_subskills]
-        : [];
+          ? [category.scorecard_subskills]
+          : [];
 
       for (const subskill of subskills) {
         const skillId = subskill?.skill_id;
@@ -849,8 +819,8 @@ export async function listEvaluationSubskillRatings(
     const items = Array.isArray(row?.evaluation_items)
       ? row.evaluation_items
       : row?.evaluation_items
-      ? [row.evaluation_items]
-      : [];
+        ? [row.evaluation_items]
+        : [];
 
     for (const item of items) {
       const skillId = item?.subskill_id;
@@ -915,10 +885,10 @@ export async function getEvaluationWorkoutSummary(
     p_user_id: user_id,
   });
 
-  const [
-    { data: evalRows, error: evalError },
-    { data: summaryRows, error: summaryError },
-  ] = await Promise.all([evalsPromise, summaryPromise]);
+  const [{ data: evalRows, error: evalError }, { data: summaryRows, error: summaryError }] = await Promise.all([
+    evalsPromise,
+    summaryPromise,
+  ]);
 
   if (evalError) {
     return { data: null, error: evalError };
@@ -935,13 +905,11 @@ export async function getEvaluationWorkoutSummary(
     }
   }
 
-  const summaryRow = Array.isArray(summaryRows) ? summaryRows[0] ?? null : summaryRows ?? null;
+  const summaryRow = Array.isArray(summaryRows) ? (summaryRows[0] ?? null) : (summaryRows ?? null);
   const totalRepsRaw = (summaryRow as any)?.total_reps ?? 0;
   const totalPlansRaw = (summaryRow as any)?.total_plans_shares ?? 0;
   const total_reps = Number.isFinite(Number(totalRepsRaw)) ? Number(totalRepsRaw) : 0;
-  const total_plans_shares = Number.isFinite(Number(totalPlansRaw))
-    ? Number(totalPlansRaw)
-    : 0;
+  const total_plans_shares = Number.isFinite(Number(totalPlansRaw)) ? Number(totalPlansRaw) : 0;
 
   return {
     data: {
@@ -953,9 +921,7 @@ export async function getEvaluationWorkoutSummary(
   };
 }
 
-export async function getTotalPlanSharesByUserId(
-  user_id: string,
-): Promise<{ data: number; error: unknown }> {
+export async function getTotalPlanSharesByUserId(user_id: string): Promise<{ data: number; error: unknown }> {
   const client = sbAdmin;
   if (!client) {
     return { data: 0, error: new Error("Supabase client not initialized") };
@@ -981,13 +947,7 @@ export async function listEvaluationWorkoutProgress(
     return { data: [], count: 0, error: new Error("Supabase client not initialized") };
   }
 
-  const {
-    org_id,
-    athlete_id,
-    evaluation_id,
-    limit = 200,
-    offset = 0,
-  } = filters;
+  const { org_id, athlete_id, evaluation_id, limit = 200, offset = 0 } = filters;
 
   let query = client
     .from("evaluation_workout_progress")
@@ -1019,9 +979,7 @@ export async function listEvaluationWorkoutProgress(
   }
 
   const mapped = (data ?? []).map((row: any) => {
-    const organization = Array.isArray(row?.organizations)
-      ? row.organizations[0]
-      : row?.organizations;
+    const organization = Array.isArray(row?.organizations) ? row.organizations[0] : row?.organizations;
 
     return {
       id: row?.id,
@@ -1075,9 +1033,7 @@ export async function incrementEvaluationWorkoutProgress(
     return { data: null, error: new Error("Workout progress not found") };
   }
 
-  const organization = Array.isArray(row?.organizations)
-    ? row.organizations[0]
-    : row?.organizations;
+  const organization = Array.isArray(row?.organizations) ? row.organizations[0] : row?.organizations;
   const maxWorkoutRepsRaw = organization?.maxWorkoutReps;
   const maxWorkoutReps = Number(maxWorkoutRepsRaw);
 
@@ -1088,12 +1044,8 @@ export async function incrementEvaluationWorkoutProgress(
     };
   }
 
-  const progressValue = Number.isFinite(Number(row.progress))
-    ? Number(row.progress)
-    : 0;
-  const levelValue = Number.isFinite(Number(row.level))
-    ? Number(row.level)
-    : 0;
+  const progressValue = Number.isFinite(Number(row.progress)) ? Number(row.progress) : 0;
+  const levelValue = Number.isFinite(Number(row.level)) ? Number(row.level) : 0;
 
   const maxProgress = maxWorkoutReps * 10;
   let nextProgress = progressValue + 1;
@@ -1155,10 +1107,7 @@ export async function listEvaluationWorkoutDrills(
     return { data: [], count: 0, error: progressError };
   }
 
-  const level =
-    typeof progressRow?.level === "number" && Number.isFinite(progressRow.level)
-      ? progressRow.level
-      : null;
+  const level = typeof progressRow?.level === "number" && Number.isFinite(progressRow.level) ? progressRow.level : null;
 
   if (level === null) {
     return { data: [], count: 0, error: null };
@@ -1212,9 +1161,7 @@ export async function listEvaluationWorkoutDrills(
   }
 
   const targetReps =
-    typeof progressRow?.progress === "number" && Number.isFinite(progressRow.progress)
-      ? progressRow.progress
-      : null;
+    typeof progressRow?.progress === "number" && Number.isFinite(progressRow.progress) ? progressRow.progress : null;
 
   const drills: EvaluationWorkoutDrillVideo[] = rows
     .map((row: any) => {
@@ -1228,9 +1175,7 @@ export async function listEvaluationWorkoutDrills(
         thumbnailUrl: media?.thumbnailUrl ?? null,
       };
     })
-    .filter((item: EvaluationWorkoutDrillVideo | null): item is EvaluationWorkoutDrillVideo =>
-      Boolean(item)
-    );
+    .filter((item: EvaluationWorkoutDrillVideo | null): item is EvaluationWorkoutDrillVideo => Boolean(item));
 
   return {
     data: [
@@ -1275,10 +1220,7 @@ export async function listLatestEvaluationWorkoutDrills(
       ? progressRow.evaluation_id.trim()
       : null;
 
-  const level =
-    typeof progressRow?.level === "number" && Number.isFinite(progressRow.level)
-      ? progressRow.level
-      : null;
+  const level = typeof progressRow?.level === "number" && Number.isFinite(progressRow.level) ? progressRow.level : null;
 
   if (!evaluation_id || level === null) {
     return { data: [], count: 0, error: null };
@@ -1332,9 +1274,7 @@ export async function listLatestEvaluationWorkoutDrills(
   }
 
   const targetReps =
-    typeof progressRow?.progress === "number" && Number.isFinite(progressRow.progress)
-      ? progressRow.progress
-      : null;
+    typeof progressRow?.progress === "number" && Number.isFinite(progressRow.progress) ? progressRow.progress : null;
 
   const drills: EvaluationWorkoutDrillVideo[] = rows
     .map((row: any) => {
@@ -1348,9 +1288,7 @@ export async function listLatestEvaluationWorkoutDrills(
         thumbnailUrl: media?.thumbnailUrl ?? null,
       };
     })
-    .filter((item: EvaluationWorkoutDrillVideo | null): item is EvaluationWorkoutDrillVideo =>
-      Boolean(item)
-    );
+    .filter((item: EvaluationWorkoutDrillVideo | null): item is EvaluationWorkoutDrillVideo => Boolean(item));
 
   return {
     data: [
@@ -1366,10 +1304,7 @@ export async function listLatestEvaluationWorkoutDrills(
   };
 }
 
-export async function getEvaluationById(
-  evaluationId: string,
-  org_id: string,
-): Promise<EvaluationDetailDto | null> {
+export async function getEvaluationById(evaluationId: string, org_id: string): Promise<EvaluationDetailDto | null> {
   if (!sbAdmin) {
     throw new Error("Supabase admin client is not configured");
   }
@@ -1457,10 +1392,7 @@ export async function deleteEvaluation(
   return { data: { id: data[0].id }, error: null };
 }
 
-
-export async function applyEvaluationMatrixUpdateService(
-  dto: EvaluationMatrixUpdateDto,
-): Promise<EvaluationDetailDto> {
+export async function applyEvaluationMatrixUpdateService(dto: EvaluationMatrixUpdateDto): Promise<EvaluationDetailDto> {
   if (!sbAdmin) {
     throw new Error("Supabase admin client is not configured");
   }
@@ -1502,10 +1434,7 @@ export async function applyEvaluationMatrixUpdateService(
       .eq("org_id", org_id);
 
     if (headerError) {
-      console.error(
-        "[applyEvaluationMatrixUpdateService] header update error",
-        headerError,
-      );
+      console.error("[applyEvaluationMatrixUpdateService] header update error", headerError);
       throw headerError;
     }
   }
@@ -1520,10 +1449,7 @@ export async function applyEvaluationMatrixUpdateService(
         .eq("athlete_id", op.athlete_id);
 
       if (error) {
-        console.error(
-          "[applyEvaluationMatrixUpdateService] remove_athlete error",
-          error,
-        );
+        console.error("[applyEvaluationMatrixUpdateService] remove_athlete error", error);
         throw error;
       }
       continue;
@@ -1531,11 +1457,7 @@ export async function applyEvaluationMatrixUpdateService(
 
     if (op.type === "upsert_rating") {
       // rating null => delete row for this (evaluation, athlete, subskill)
-      if (
-        op.rating === null ||
-        op.rating === undefined ||
-        Number.isNaN(Number(op.rating))
-      ) {
+      if (op.rating === null || op.rating === undefined || Number.isNaN(Number(op.rating))) {
         const { error } = await sbAdmin
           .from("evaluation_items")
           .delete()
@@ -1544,10 +1466,7 @@ export async function applyEvaluationMatrixUpdateService(
           .eq("subskill_id", op.subskill_id);
 
         if (error) {
-          console.error(
-            "[applyEvaluationMatrixUpdateService] delete rating error",
-            error,
-          );
+          console.error("[applyEvaluationMatrixUpdateService] delete rating error", error);
           throw error;
         }
         continue;
@@ -1565,10 +1484,7 @@ export async function applyEvaluationMatrixUpdateService(
         .maybeSingle();
 
       if (selectError) {
-        console.error(
-          "[applyEvaluationMatrixUpdateService] select existing item error",
-          selectError,
-        );
+        console.error("[applyEvaluationMatrixUpdateService] select existing item error", selectError);
         throw selectError;
       }
 
@@ -1583,10 +1499,7 @@ export async function applyEvaluationMatrixUpdateService(
           .eq("id", existing.id);
 
         if (updateError) {
-          console.error(
-            "[applyEvaluationMatrixUpdateService] update rating error",
-            updateError,
-          );
+          console.error("[applyEvaluationMatrixUpdateService] update rating error", updateError);
           throw updateError;
         }
       } else {
@@ -1601,10 +1514,7 @@ export async function applyEvaluationMatrixUpdateService(
         });
 
         if (insertError) {
-          console.error(
-            "[applyEvaluationMatrixUpdateService] insert rating error",
-            insertError,
-          );
+          console.error("[applyEvaluationMatrixUpdateService] insert rating error", insertError);
           throw insertError;
         }
       }
@@ -1620,10 +1530,7 @@ export async function applyEvaluationMatrixUpdateService(
   return updated;
 }
 
-export async function submitEvaluation(
-  evaluationId: string,
-  org_id: string,
-): Promise<SubmitEvaluationResult> {
+export async function submitEvaluation(evaluationId: string, org_id: string): Promise<SubmitEvaluationResult> {
   const toError = (err: unknown): Error => {
     if (err instanceof Error) return err;
     if (err && typeof err === "object" && "message" in err) {
@@ -1688,10 +1595,7 @@ function buildEvaluationLink(evaluationId: string): string {
   return `${base}/reports/evaluation-reports/${evaluationId}`;
 }
 
-async function getEvaluationReportContext(
-  evaluationId: string,
-  org_id: string,
-): Promise<EvaluationReportContext> {
+async function getEvaluationReportContext(evaluationId: string, org_id: string): Promise<EvaluationReportContext> {
   const client = sbAdmin;
   if (!client) {
     throw new Error("Supabase client not initialized");
@@ -1732,14 +1636,10 @@ async function getEvaluationReportContext(
       : "your coach";
 
   const evaluationTitle =
-    typeof data?.template?.name === "string" && data.template.name.trim()
-      ? data.template.name.trim()
-      : "Evaluation";
+    typeof data?.template?.name === "string" && data.template.name.trim() ? data.template.name.trim() : "Evaluation";
 
   const teamOrOrgName =
-    typeof data?.team?.name === "string" && data.team.name.trim()
-      ? data.team.name.trim()
-      : "your organization";
+    typeof data?.team?.name === "string" && data.team.name.trim() ? data.team.name.trim() : "your organization";
 
   return {
     coachName,
@@ -1750,9 +1650,7 @@ async function getEvaluationReportContext(
   };
 }
 
-async function listEvaluationReportRecipients(
-  evaluationId: string,
-): Promise<EvaluationReportRecipient[]> {
+async function listEvaluationReportRecipients(evaluationId: string): Promise<EvaluationReportRecipient[]> {
   const client = sbAdmin;
   if (!client) {
     throw new Error("Supabase client not initialized");
@@ -1784,13 +1682,8 @@ async function listEvaluationReportRecipients(
     const athlete = (row as any)?.athlete;
     if (!athlete) continue;
 
-    const profileRaw = Array.isArray(athlete?.profiles)
-      ? athlete.profiles[0]
-      : athlete?.profiles;
-    const email =
-      typeof profileRaw?.email === "string" && profileRaw.email.trim()
-        ? profileRaw.email.trim()
-        : "";
+    const profileRaw = Array.isArray(athlete?.profiles) ? athlete.profiles[0] : athlete?.profiles;
+    const email = typeof profileRaw?.email === "string" && profileRaw.email.trim() ? profileRaw.email.trim() : "";
     if (!email) continue;
 
     const normalizedEmail = email.toLowerCase();
@@ -1801,8 +1694,8 @@ async function listEvaluationReportRecipients(
       typeof athlete?.first_name === "string" && athlete.first_name.trim()
         ? athlete.first_name.trim()
         : typeof profileRaw?.first_name === "string" && profileRaw.first_name.trim()
-        ? profileRaw.first_name.trim()
-        : null;
+          ? profileRaw.first_name.trim()
+          : null;
 
     recipients.push({
       email: normalizedEmail,

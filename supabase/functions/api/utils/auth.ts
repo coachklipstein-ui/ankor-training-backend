@@ -22,9 +22,7 @@ export function isAdminRole(role: OrgRole): boolean {
   return role === "owner" || role === "admin";
 }
 
-export async function requireAuthUser(
-  req: Request,
-): Promise<{ user: AuthUser } | { response: Response }> {
+export async function requireAuthUser(req: Request): Promise<{ user: AuthUser } | { response: Response }> {
   const token = getBearerToken(req);
   if (!token) return { response: unauthorized("Missing bearer token") };
   if (!sbAnon) return { response: unauthorized("Auth client not configured") };
@@ -43,28 +41,18 @@ export async function requireAuthUser(
   };
 }
 
-export async function requireSysAdmin(
-  user: AuthUser,
-): Promise<{ ok: true } | { response: Response }> {
-  const appRole =
-    typeof user.app_metadata?.role === "string"
-      ? user.app_metadata.role.trim().toLowerCase()
-      : "";
+export async function requireSysAdmin(user: AuthUser): Promise<{ ok: true } | { response: Response }> {
+  const appRole = typeof user.app_metadata?.role === "string" ? user.app_metadata.role.trim().toLowerCase() : "";
   if (appRole === "sys-admin") return { ok: true };
 
   const client = sbAdmin;
   if (!client) return { response: forbidden("Auth admin client not configured") };
 
-  const { data, error } = await client
-    .from("profiles")
-    .select("role")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { data, error } = await client.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
 
   if (error) return { response: forbidden("Unable to verify system role") };
 
-  const profileRole =
-    typeof data?.role === "string" ? data.role.trim().toLowerCase() : "";
+  const profileRole = typeof data?.role === "string" ? data.role.trim().toLowerCase() : "";
 
   if (profileRole !== "sys-admin") {
     return { response: forbidden("Only sys-admin users can perform this action") };
@@ -73,28 +61,18 @@ export async function requireSysAdmin(
   return { ok: true };
 }
 
-export async function requireAdminOrSysAdmin(
-  user: AuthUser,
-): Promise<{ ok: true } | { response: Response }> {
-  const appRole =
-    typeof user.app_metadata?.role === "string"
-      ? user.app_metadata.role.trim().toLowerCase()
-      : "";
+export async function requireAdminOrSysAdmin(user: AuthUser): Promise<{ ok: true } | { response: Response }> {
+  const appRole = typeof user.app_metadata?.role === "string" ? user.app_metadata.role.trim().toLowerCase() : "";
   if (appRole === "admin" || appRole === "sys-admin") return { ok: true };
 
   const client = sbAdmin;
   if (!client) return { response: forbidden("Auth admin client not configured") };
 
-  const { data, error } = await client
-    .from("profiles")
-    .select("role")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { data, error } = await client.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
 
   if (error) return { response: forbidden("Unable to verify user role") };
 
-  const profileRole =
-    typeof data?.role === "string" ? data.role.trim().toLowerCase() : "";
+  const profileRole = typeof data?.role === "string" ? data.role.trim().toLowerCase() : "";
 
   if (profileRole !== "admin" && profileRole !== "sys-admin") {
     return { response: forbidden("Only admin or sys-admin users can perform this action") };
@@ -103,10 +81,7 @@ export async function requireAdminOrSysAdmin(
   return { ok: true };
 }
 
-async function ensureUser(
-  req: Request,
-  ctx: RequestContext,
-): Promise<{ user: AuthUser } | { response: Response }> {
+async function ensureUser(req: Request, ctx: RequestContext): Promise<{ user: AuthUser } | { response: Response }> {
   if (ctx.user) return { user: ctx.user };
   const auth = await requireAuthUser(req);
   if ("response" in auth) return auth;
@@ -122,10 +97,7 @@ export function authMiddleware(): Middleware {
   };
 }
 
-async function getOrgRole(
-  userId: string,
-  orgId: string,
-): Promise<OrgRole | null> {
+async function getOrgRole(userId: string, orgId: string): Promise<OrgRole | null> {
   const client = sbAdmin;
   if (!client) return null;
 
@@ -135,11 +107,7 @@ async function getOrgRole(
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (
-    !profileError &&
-    typeof profile?.role === "string" &&
-    profile.role.trim().toLowerCase() === "sys-admin"
-  ) {
+  if (!profileError && typeof profile?.role === "string" && profile.role.trim().toLowerCase() === "sys-admin") {
     return "owner";
   }
 

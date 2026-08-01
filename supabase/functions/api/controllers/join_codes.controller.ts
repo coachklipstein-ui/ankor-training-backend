@@ -11,14 +11,7 @@ import {
   listJoinCodes,
   updateJoinCode,
 } from "../services/join_codes.service.ts";
-import {
-  badRequest,
-  created,
-  internalError,
-  json,
-  methodNotAllowed,
-  notFound,
-} from "../utils/http.ts";
+import { badRequest, created, internalError, json, methodNotAllowed, notFound } from "../utils/http.ts";
 import type { RequestContext } from "../routes/router.ts";
 import { RE_UUID } from "../utils/uuid.ts";
 
@@ -101,10 +94,7 @@ export async function getJoinCodeController(
   return json(200, { ok: true, join_code: data });
 }
 
-export async function createJoinCodeController(
-  req: Request,
-  _origin?: string | null,
-): Promise<Response> {
+export async function createJoinCodeController(req: Request, _origin?: string | null): Promise<Response> {
   if (req.method !== "POST") {
     return methodNotAllowed(["POST"]);
   }

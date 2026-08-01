@@ -39,9 +39,7 @@ function getErrorMessage(err: unknown): string {
   return "Unexpected error";
 }
 
-function parseStorageObjectUrl(
-  value: string,
-): { bucket: string; path: string } | null {
+function parseStorageObjectUrl(value: string): { bucket: string; path: string } | null {
   let url: URL;
   try {
     url = new URL(value);
@@ -56,7 +54,7 @@ function parseStorageObjectUrl(
   const parts = rest.split("/").filter(Boolean);
   if (parts.length < 2) return null;
 
-  const offset = (parts[0] === "public" || parts[0] === "sign") ? 1 : 0;
+  const offset = parts[0] === "public" || parts[0] === "sign" ? 1 : 0;
   if (parts.length - offset < 2) return null;
 
   const bucket = parts[offset];
@@ -337,9 +335,7 @@ export async function handleSkillMediaPlayback(
 
   const rawExpires = url.searchParams.get("expires_in");
   const parsedExpires = rawExpires ? Number.parseInt(rawExpires, 10) : NaN;
-  const expires_in = Number.isFinite(parsedExpires)
-    ? Math.min(Math.max(parsedExpires, 60), 60 * 60 * 24)
-    : 60 * 60;
+  const expires_in = Number.isFinite(parsedExpires) ? Math.min(Math.max(parsedExpires, 60), 60 * 60 * 24) : 60 * 60;
 
   const { data, error } = await getSkillMediaPlaybackUrl(skill_id, expires_in);
   if (error) {
