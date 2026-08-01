@@ -23,6 +23,13 @@ export async function handleAuthSignup(req: Request, origin: string | null) {
   const base = parsed.data as any; // athlete | coach | parent
   const positionId = base.role === "athlete" && typeof base.position_id === "string" ? base.position_id.trim() : "";
 
+  if (base.role === "athlete") {
+    const parentEmail = typeof base.parentEmail === "string" ? base.parentEmail.trim() : "";
+    if (parentEmail && parentEmail.toLowerCase() === String(base.email).trim().toLowerCase()) {
+      return badRequest("Parent email must be different from athlete email", origin);
+    }
+  }
+
   // Create auth user
   const { data: created, error: createErr } = await sbAdmin!.auth.admin.createUser({
     email: base.email,

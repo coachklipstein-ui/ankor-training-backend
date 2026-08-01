@@ -18,6 +18,12 @@ export const AthleteSchema = z.object({
   position_id: uuid(),
   termsAccepted: z.literal(true),
   username: z.string().trim().min(3).max(50).optional(),
+  // Empty string / null → null so optional parent email is omitted cleanly
+  parentEmail: z.preprocess((val) => {
+    if (val == null) return null;
+    if (typeof val === "string" && val.trim() === "") return null;
+    return val;
+  }, z.string().trim().email("Invalid parent email").nullable().optional()),
 });
 export const CoachSchema = z.object({
   role: z.literal("coach"),
