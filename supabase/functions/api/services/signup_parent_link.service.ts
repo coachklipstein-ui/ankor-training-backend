@@ -313,8 +313,11 @@ export async function createAndInviteParentForAthlete(args: {
           user_id: parentUserId,
         },
       });
-      await sendWelcomeEmail(email, null, actionLink);
-      invite_email_sent = true;
+      const emailResult = await sendWelcomeEmail(email, null, actionLink);
+      invite_email_sent = emailResult.ok;
+      if (!emailResult.ok) {
+        parent_link_error = `Invite email failed: ${emailResult.error}`;
+      }
     } catch (emailErr) {
       const message = emailErr instanceof Error ? emailErr.message : String(emailErr);
       parent_link_error = `Invite email failed: ${message}`;

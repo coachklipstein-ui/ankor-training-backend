@@ -468,7 +468,10 @@ export async function handleTestWelcomeEmail(
       }
     }
 
-    await sendWelcomeEmail(email, fullName, actionLink, { from, subject });
+    const emailResult = await sendWelcomeEmail(email, fullName, actionLink, { from, subject });
+    if (!emailResult.ok) {
+      return serverError(`Failed to send welcome email: ${emailResult.error}`, origin);
+    }
     return json({ ok: true, email, action_link: actionLink }, origin);
   } catch (err) {
     console.error("[handleTestWelcomeEmail] failed", err);
