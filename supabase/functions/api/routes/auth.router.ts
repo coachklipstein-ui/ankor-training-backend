@@ -1,6 +1,7 @@
 // src/routes/auth.router.ts
 import { Router } from "./router.ts";
 import {
+  handleActivateParent,
   handleAuthLogin,
   handleAuthSignup,
   handleTestWelcomeEmail,
@@ -16,6 +17,8 @@ export function createAuthRouter(): Router {
   router.add("POST", "signup", handleAuthSignup);
   // POST /api/auth/login
   router.add("POST", "login", handleAuthLogin);
+  // POST /api/auth/activate-parent
+  router.add("POST", "activate-parent", handleActivateParent, [requireAuth]);
   // POST /api/auth/welcome-email/test
   router.add("POST", "welcome-email/test", handleTestWelcomeEmail, [requireAuth]);
   // POST /api/auth/evaluation-reports/test
