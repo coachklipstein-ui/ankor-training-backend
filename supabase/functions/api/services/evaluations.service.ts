@@ -3,6 +3,7 @@ import { EvaluationInput, EvaluationWithItems } from "../schemas/evaluations.ts"
 import { EvaluationDetailDto, type EvaluationMatrixUpdateDto, toEvaluationDetailDto } from "../dtos/evaluations.dto.ts";
 import { INVITE_REDIRECT_URL } from "../config/env.ts";
 import type { EvaluationReportEmailInput } from "./email.service.ts";
+import { getAthleteById } from "./athletes.service.ts";
 
 type SubmitEvaluationResult = { ok: true; data: { id: string; status: string } } | { ok: false; error: unknown };
 
@@ -1661,6 +1662,8 @@ async function listEvaluationReportRecipients(evaluationId: string): Promise<Eva
     .select(
       `
       athlete:athletes!inner (
+        id,
+        org_id,
         first_name,
         profiles!inner (
           email,
@@ -1701,6 +1704,18 @@ async function listEvaluationReportRecipients(evaluationId: string): Promise<Eva
       email: normalizedEmail,
       athleteFirstName,
     });
+
+    const athleteResult = await getAthleteById(athlete.id, athlete.org_id);
+
+    if (!athleteResult.error && athleteResult.data && athleteResult.data.parent) {
+      const parent = athleteResult.data.parent;
+      if (parent.email && parent.full_name) {
+        recipients.push({
+          email: parent?.email?.toLowerCase(),
+          athleteFirstName: parent.full_name,
+        });
+      }
+    }
   }
 
   return recipients;
