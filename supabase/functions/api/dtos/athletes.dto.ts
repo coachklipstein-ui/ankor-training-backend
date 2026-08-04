@@ -20,21 +20,21 @@ export const CreateAthleteSchema = z
   .object({
     org_id: uuid(),
     team_id: uuid(),
-    first_name: z.string().trim().min(1, "first_name is required"),
-    last_name: z.string().trim().min(1, "last_name is required"),
+    first_name: z.string().trim().min(1, "First Name is required"),
+    last_name: z.string().trim().min(1, "Last Name is required"),
     full_name: z.string().trim().min(1).optional().nullable(),
-    email: z.string().trim().email("email is required"),
+    email: z.string().trim().email("Email is invalid"),
     password: z.string().min(8, "password must be at least 8 characters"),
     phone: z.string().trim().optional().nullable(),
     cell_number: z.string().trim().optional().nullable(),
-    gender: z.string().trim().min(1, "gender is required"),
-    parent_email: z.string().trim().email("parent_email is required").optional().nullable(),
-    parent_full_name: z.string().trim().min(1, "parent_full_name is required").optional().nullable(),
-    parent_mobile_phone: z.string().trim().min(1, "parent_mobile_phone is required").optional().nullable(),
+    gender: z.string().trim().min(1, "Gender is required"),
+    parent_email: z.string().trim().email("Parent email is invalid").optional().nullable(),
+    parent_full_name: z.string().trim().min(1, "Parent Full Name is required").optional().nullable(),
+    parent_mobile_phone: z.string().trim().min(1, "Parent Mobile Phone is required").optional().nullable(),
     position_id: uuid().optional().nullable(),
     relationship: z
       .enum(["mother", "father", "guardian", "step-parent", "grandparent", "sibling", "other"], {
-        required_error: "relationship is required",
+        required_error: "Relationship is required",
       })
       .optional()
       .nullable(),
