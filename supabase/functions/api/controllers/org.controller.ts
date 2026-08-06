@@ -15,6 +15,7 @@ import {
 } from "../utils/http.ts";
 import { badRequest, json, serverError } from "../utils/responses.ts";
 import { RE_UUID } from "../utils/uuid.ts";
+import { RequestContext } from "../routes/router.ts";
 
 type Body = {
   admin: { firstName: string; lastName: string; email: string; phone?: string | null; password: string };
@@ -143,7 +144,7 @@ function parseOffset(value: string | null): number {
   return parsed;
 }
 
-function parseListOrganizationsFilters(url: URL): { value?: ListOrganizationsFilters; error?: string } {
+function parseListOrganizationsFilters(url: URL, adminId: string): { value?: ListOrganizationsFilters; error?: string } {
   const q = (url.searchParams.get("q") ?? url.searchParams.get("search") ?? "").trim();
   const programGender = (url.searchParams.get("program_gender") ?? url.searchParams.get("programGender") ?? "").trim();
   const sportId = (url.searchParams.get("sport_id") ?? "").trim();
@@ -162,6 +163,7 @@ function parseListOrganizationsFilters(url: URL): { value?: ListOrganizationsFil
       sport_id: sportId || undefined,
       limit: parseLimit(url.searchParams.get("limit"), 50, 100),
       offset: parseOffset(url.searchParams.get("offset")),
+      adminId: adminId,
     },
   };
 }
@@ -218,10 +220,13 @@ function parseUpdateOrganization(body: unknown): { value?: UpdateOrganizationInp
   return { value: input };
 }
 
-export async function listOrganizationsController(req: Request): Promise<Response> {
+export async function listOrganizationsController(req: Request,
+  _origin?: string | null,
+  _params?: Record<string, string>,
+  ctx?: RequestContext,): Promise<Response> {
   if (req.method !== "GET") return methodNotAllowed(["GET"]);
 
-  const parsed = parseListOrganizationsFilters(new URL(req.url));
+  const parsed = parseListOrganizationsFilters(new URL(req.url), ctx?.user?.id ?? "");
   if (parsed.error || !parsed.value) return httpBadRequest(parsed.error ?? "Invalid filters");
 
   const { data, count, error } = await listOrganizations(parsed.value);

@@ -19,6 +19,7 @@ export type ListOrganizationsFilters = {
   sport_id?: string;
   limit: number;
   offset: number;
+  adminId: string;
 };
 
 export type UpdateOrganizationInput = {
@@ -42,11 +43,28 @@ export async function listOrganizations(filters: ListOrganizationsFilters): Prom
   const client = sbAdmin;
   if (!client) return { data: [], count: 0, error: new Error("Supabase admin client not configured") };
 
+  const { data: profile, error: profileError } = await client
+    .from("profiles")
+    .select("role, default_org_id")
+    .eq("user_id", filters.adminId)
+    .maybeSingle();
+
   let query = client
     .from("organizations")
     .select(ORG_SELECT, { count: "exact" })
+
     .order("created_at", { ascending: false })
     .range(filters.offset, filters.offset + filters.limit - 1);
+
+  if (!profileError && typeof profile?.role === "string" && profile.role.trim().toLowerCase() === "admin") {
+    const { data: orgIdData } = await client.from("org_memberships").
+      select("org_id")
+      .eq("user_id", filters.adminId)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    query = query.eq("id", orgIdData?.org_id);
+  }
 
   if (filters.q) {
     query = query.or(`name.ilike.%${filters.q}%,slug.ilike.%${filters.q}%`);
