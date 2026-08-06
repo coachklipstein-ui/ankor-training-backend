@@ -314,7 +314,7 @@ export async function listLatestEvaluationsByAthlete(
         id,
         org_id,
         created_at,
-        coach:coaches!inner (
+        coach:coaches(
           id,
           full_name
         ),

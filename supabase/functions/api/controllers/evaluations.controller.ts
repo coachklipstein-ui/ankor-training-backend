@@ -132,7 +132,6 @@ function parseEvaluation(raw: unknown, index: number): EvaluationInput {
   const requiredFields: Array<keyof EvaluationInput> = [
     "org_id",
     "scorecard_template_id",
-    "coach_id",
     "evaluation_items",
   ];
 
@@ -156,7 +155,7 @@ function parseEvaluation(raw: unknown, index: number): EvaluationInput {
     org_id: String(obj.org_id),
     scorecard_template_id: String(obj.scorecard_template_id),
     team_id,
-    coach_id: String(obj.coach_id),
+    coach_id: obj.coach_id ? String(obj.coach_id) : null,
     notes: obj.notes === undefined || obj.notes === null ? null : String(obj.notes),
     evaluation_items: items,
   };
