@@ -1,4 +1,4 @@
-﻿SET check_function_bodies = false;
+SET check_function_bodies = false;
 ALTER TABLE public.athlete_positions DROP COLUMN "position";
 CREATE OR REPLACE FUNCTION public.evaluations_bulk_create_tx(evaluations jsonb)
  RETURNS jsonb
