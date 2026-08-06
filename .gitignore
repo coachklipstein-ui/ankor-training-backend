@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 .env
 /drills
+/supabase/migrations/legacy
+/supabase-migration/temp
