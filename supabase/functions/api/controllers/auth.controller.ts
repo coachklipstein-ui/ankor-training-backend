@@ -1,8 +1,15 @@
-import { SignUpSchema } from "../schemas/schemas.ts";
+import { ActivateParentSchema, SignUpSchema } from "../schemas/schemas.ts";
 import { json, badRequest, conflict, notFound, serverError } from "../utils/responses.ts";
 import { AuthLoginSchema } from "../schemas/schemas.ts";
 import { sbAdmin, sbAnon } from "../services/supabase.ts";
 import { rpcRegisterAthlete, rpcRegisterCoach, rpcRegisterParent } from "../services/signup.service..ts";
+import {
+  activateParentProfile,
+  createAndInviteParentForAthlete,
+  linkExistingParentToAthlete,
+  resolveParentEmailForSignup,
+  type ParentProfileForLink,
+} from "../services/signup_parent_link.service.ts";
 import {
   generateInviteLink,
   generateMagicLink,
@@ -21,7 +28,34 @@ export async function handleAuthSignup(req: Request, origin: string | null) {
     return badRequest(msg, origin);
   }
   const base = parsed.data as any; // athlete | coach | parent
-  const positionId = base.role === "athlete" && typeof base.position_id === "string" ? base.position_id.trim() : "";
+  const positionId = base.role === "athlete" ? (base.position_id?.trim() ?? "") : "";
+
+  let parentEmail = "";
+  let parentProfileToLink: ParentProfileForLink | null = null;
+  let shouldInviteNewParent = false;
+
+  if (base.role === "athlete") {
+    parentEmail = base.parentEmail?.trim() ?? "";
+    if (parentEmail && parentEmail.toLowerCase() === String(base.email).trim().toLowerCase()) {
+      return badRequest("Parent email must be different from athlete email", origin);
+    }
+
+    if (parentEmail) {
+      const resolved = await resolveParentEmailForSignup(parentEmail);
+      if (resolved.status === "error") {
+        const message = resolved.error instanceof Error ? resolved.error.message : String(resolved.error);
+        return serverError(`Failed to resolve parent email: ${message}`, origin);
+      }
+      if (resolved.status === "non_parent") {
+        return badRequest("Parent email belongs to an existing non-parent account. Use a different email.", origin);
+      }
+      if (resolved.status === "parent") {
+        parentProfileToLink = resolved.profile;
+      } else if (resolved.status === "none") {
+        shouldInviteNewParent = true;
+      }
+    }
+  }
 
   // Create auth user
   const { data: created, error: createErr } = await sbAdmin!.auth.admin.createUser({
@@ -96,9 +130,63 @@ export async function handleAuthSignup(req: Request, origin: string | null) {
 
     const out = Array.isArray(txData) && txData[0] ? txData[0] : {};
 
+    let parent_linked: boolean | null = null;
+    let parent_invited: boolean | null = null;
+    let invite_email_sent: boolean | null = null;
+    let guardian_id: string | null = null;
+    let parent_link_error: string | null = null;
+
+    if (base.role === "athlete" && parentEmail && (parentProfileToLink || shouldInviteNewParent)) {
+      const orgId = out.org_id?.trim() ?? "";
+      const athleteId = out.athlete_id?.trim() ?? "";
+
+      if (!orgId || !athleteId) {
+        parent_linked = false;
+        parent_invited = false;
+        invite_email_sent = false;
+        parent_link_error = "Athlete signup succeeded but org/athlete ids were missing for parent link";
+        console.error("[handleAuthSignup] parent link skipped", { orgId, athleteId });
+      } else if (parentProfileToLink) {
+        const linkResult = await linkExistingParentToAthlete({
+          orgId,
+          athleteId,
+          profile: parentProfileToLink,
+          parentEmail,
+        });
+
+        parent_invited = false;
+        invite_email_sent = false;
+        if (linkResult.ok) {
+          parent_linked = true;
+          guardian_id = linkResult.guardian_id;
+        } else {
+          parent_linked = false;
+          parent_link_error = linkResult.error;
+          console.error("[handleAuthSignup] parent link failed", linkResult.error);
+        }
+      } else if (shouldInviteNewParent) {
+        const inviteResult = await createAndInviteParentForAthlete({
+          orgId,
+          athleteId,
+          parentEmail,
+        });
+
+        parent_linked = inviteResult.parent_linked;
+        parent_invited = inviteResult.parent_invited;
+        invite_email_sent = inviteResult.invite_email_sent;
+        parent_link_error = inviteResult.parent_link_error;
+        if (inviteResult.ok) {
+          guardian_id = inviteResult.guardian_id;
+        } else {
+          console.error("[handleAuthSignup] parent invite failed", inviteResult.parent_link_error);
+        }
+      }
+    }
+
     try {
       const fullName = [base.firstName, base.lastName]
-        .filter((part) => typeof part === "string" && part.trim().length > 0)
+        .map((part) => part?.trim() ?? "")
+        .filter(Boolean)
         .join(" ");
       const { actionLink } = await generateMagicLink(base.email, {
         data: { role: base.role, user_id: userId },
@@ -108,7 +196,26 @@ export async function handleAuthSignup(req: Request, origin: string | null) {
       console.error("[handleAuthSignup] welcome email failed", emailErr);
     }
 
-    return json({ ok: true, user_id: userId, role: base.role, ...out, message: "Welcome to ANKOR!" }, origin, 201);
+    return json(
+      {
+        ok: true,
+        user_id: userId,
+        role: base.role,
+        ...out,
+        ...(base.role === "athlete" && parentEmail
+          ? {
+              parent_linked,
+              parent_invited,
+              invite_email_sent,
+              guardian_id,
+              parent_link_error,
+            }
+          : {}),
+        message: "Welcome to ANKOR!",
+      },
+      origin,
+      201,
+    );
   } catch (e) {
     // rollback auth user
     await sbAdmin!.auth.admin.deleteUser(userId).catch(() => {});
@@ -123,6 +230,38 @@ export async function handleAuthSignup(req: Request, origin: string | null) {
     if (m.includes("EMAIL_REQUIRED")) return badRequest("Valid email is required.", origin);
     return serverError(`Signup failed: ${m}`, origin);
   }
+}
+
+export async function handleActivateParent(
+  req: Request,
+  origin: string | null,
+  _params?: Record<string, string>,
+  ctx?: { user?: { id: string; email: string | null } },
+) {
+  if (req.method !== "POST") return badRequest("Use POST", origin);
+
+  const userId = ctx?.user?.id?.trim() ?? "";
+  if (!userId) return json({ ok: false, error: "Unauthorized" }, origin, 401);
+
+  const payload = await req.json().catch(() => null);
+  const parsed = ActivateParentSchema.safeParse(payload);
+  if (!parsed.success) {
+    const msg = parsed.error.issues.map((i) => i.message).join("; ");
+    return badRequest(msg, origin);
+  }
+
+  const result = await activateParentProfile({
+    userId,
+    firstName: parsed.data.firstName,
+    lastName: parsed.data.lastName,
+    cellNumber: parsed.data.cellNumber,
+  });
+
+  if (!result.ok) {
+    return badRequest(result.error, origin);
+  }
+
+  return json({ ok: true, message: "Parent account activated" }, origin);
 }
 
 export async function handleAuthLogin(req: Request, origin: string | null) {
@@ -329,7 +468,10 @@ export async function handleTestWelcomeEmail(
       }
     }
 
-    await sendWelcomeEmail(email, fullName, actionLink, { from, subject });
+    const emailResult = await sendWelcomeEmail(email, fullName, actionLink, { from, subject });
+    if (!emailResult.ok) {
+      return serverError(`Failed to send welcome email: ${emailResult.error}`, origin);
+    }
     return json({ ok: true, email, action_link: actionLink }, origin);
   } catch (err) {
     console.error("[handleTestWelcomeEmail] failed", err);

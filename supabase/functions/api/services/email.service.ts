@@ -1,4 +1,6 @@
-import { INVITE_REDIRECT_URL, RESEND_API_KEY, RESEND_FROM } from "../config/env.ts";
+import { EMAIL_FROM, INVITE_REDIRECT_URL, RESEND_FROM } from "../config/env.ts";
+import type { EmailSendResult } from "./email/email.types.ts";
+import { sendEmail } from "./email/sendEmail.ts";
 import { sbAdmin } from "./supabase.ts";
 
 type AuthLinkType = "invite" | "magiclink" | "recovery" | "signup";
@@ -47,6 +49,16 @@ function requireValue(value: string, name: string): string {
     throw new Error(`${name} is required`);
   }
   return trimmed;
+}
+
+function resolveFromAddress(override?: string): string {
+  const candidates = [override, EMAIL_FROM, RESEND_FROM];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+  }
+  throw new Error("EMAIL_FROM is required");
 }
 
 function escapeHtml(input: string): string {
@@ -104,7 +116,7 @@ function normalizeEvaluationReportPayload(
   const teamOrOrgName = requireValue(readReportValue(item, "teamOrOrgName"), "teamOrOrgName");
   const evaluationLink = requireValue(readReportValue(item, "evaluationLink"), "evaluationLink");
 
-  const from = requireValue(defaults.from, "RESEND_FROM");
+  const from = requireValue(defaults.from, "EMAIL_FROM");
   const subjectRaw = typeof item.subject === "string" ? item.subject.trim() : "";
   const subject = subjectRaw || defaults.subject;
 
@@ -230,6 +242,13 @@ export async function generateInviteLink(
   return await generateAuthLink(email, { ...options, type: "invite" });
 }
 
+export async function generateRecoveryLink(
+  email: string,
+  options: Omit<AuthLinkOptions, "type"> = {},
+): Promise<{ actionLink: string; userId: string | null }> {
+  return await generateAuthLink(email, { ...options, type: "recovery" });
+}
+
 export async function generateMagicLink(
   email: string,
   options: Omit<AuthLinkOptions, "type"> = {},
@@ -237,22 +256,26 @@ export async function generateMagicLink(
   return await generateAuthLink(email, { ...options, type: "magiclink" });
 }
 
+/**
+ * Builds and delivers the welcome email.
+ * Delivery failures are logged (log-and-continue); check the returned result if needed.
+ */
 export async function sendWelcomeEmail(
   to: string,
   fullName: string | null,
   actionLink: string,
   options: WelcomeEmailOptions = {},
-): Promise<void> {
-  const apiKey = requireValue(RESEND_API_KEY, "RESEND_API_KEY");
-  const from = requireValue(options.from ?? RESEND_FROM, "RESEND_FROM");
-  const recipient = requireValue(to, "to");
-  const link = requireValue(actionLink, "actionLink");
+): Promise<EmailSendResult> {
+  try {
+    const from = resolveFromAddress(options.from);
+    const recipient = requireValue(to, "to");
+    const link = requireValue(actionLink, "actionLink");
 
-  const safeName = fullName?.trim() ?? "";
-  const nameSuffix = safeName ? `, ${escapeHtml(safeName)}` : "";
-  const safeLink = escapeHtml(link);
+    const safeName = fullName?.trim() ?? "";
+    const nameSuffix = safeName ? `, ${escapeHtml(safeName)}` : "";
+    const safeLink = escapeHtml(link);
 
-  const html = `
+    const html = `
     <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;">
       <h2>Welcome to ANKOR${nameSuffix}</h2>
       <p>Your account is ready. Click below to finish setup:</p>
@@ -264,23 +287,16 @@ export async function sendWelcomeEmail(
     </div>
   `;
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      from,
+    return await sendEmail({
       to: recipient,
+      from,
       subject: options.subject ?? "Welcome to ANKOR",
       html,
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Resend failed: ${res.status} ${body}`);
+    });
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    console.error("[sendWelcomeEmail] failed before delivery", error);
+    return { ok: false, error };
   }
 }
 
@@ -292,8 +308,7 @@ export async function sendBulkEvaluationReportEmails(
     throw new Error("items must be a non-empty array");
   }
 
-  const apiKey = requireValue(RESEND_API_KEY, "RESEND_API_KEY");
-  const defaultFrom = requireValue(RESEND_FROM, "RESEND_FROM");
+  const defaultFrom = resolveFromAddress();
   const defaultSubject = (options.subject ?? "New evaluation available").trim() || "New evaluation available";
   const defaultAppName = (options.appName ?? "ANKOR").trim() || "ANKOR";
 
@@ -310,30 +325,14 @@ export async function sendBulkEvaluationReportEmails(
         const html = buildEvaluationReportEmailHtml(templateData);
         const text = buildEvaluationReportEmailText(templateData);
 
-        const res = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            from,
-            to,
-            subject,
-            html,
-            text,
-          }),
-        });
-
-        if (!res.ok) {
-          const body = await res.text();
-          throw new Error(`Resend failed: ${res.status} ${body}`);
+        const result = await sendEmail({ to, from, subject, html, text });
+        if (!result.ok) {
+          return { ok: false as const, to, error: result.error };
         }
-
-        return { ok: true, to };
+        return { ok: true as const, to };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        return { ok: false, to: toCandidate || "(unknown)", error: message };
+        return { ok: false as const, to: toCandidate || "(unknown)", error: message };
       }
     }),
   );

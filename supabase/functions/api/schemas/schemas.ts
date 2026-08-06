@@ -18,6 +18,12 @@ export const AthleteSchema = z.object({
   position_id: uuid(),
   termsAccepted: z.literal(true),
   username: z.string().trim().min(3).max(50).optional(),
+  // Empty string / null → null so optional parent email is omitted cleanly
+  parentEmail: z.preprocess((val) => {
+    if (val == null) return null;
+    if (typeof val === "string") return val.trim() === "" ? null : val;
+    return val;
+  }, z.string().trim().email("Invalid parent email").nullable().optional()),
 });
 export const CoachSchema = z.object({
   role: z.literal("coach"),
@@ -48,6 +54,13 @@ export const AuthLoginSchema = z.object({
   user_id: uuid(),
 });
 export type AuthLoginInput = z.infer<typeof AuthLoginSchema>;
+
+export const ActivateParentSchema = z.object({
+  firstName: z.string().trim().min(1, "First name is required"),
+  lastName: z.string().trim().min(1, "Last name is required"),
+  cellNumber: z.string().trim().min(1, "Cell number is required"),
+});
+export type ActivateParentInput = z.infer<typeof ActivateParentSchema>;
 
 // ---- Scorecard template (create) ----
 export const SubskillInputSchema = z.object({
