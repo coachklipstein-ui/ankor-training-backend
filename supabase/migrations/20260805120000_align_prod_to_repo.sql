@@ -53,7 +53,7 @@ begin
       )
       values (
         v_evaluation_id,
-        (v_eval->>'athlete_id')::uuid,
+        (v_item->>'athlete_id')::uuid,
         (v_item->>'skill_id')::uuid,
         nullif(v_item->>'rating', '')::numeric,
         nullif(coalesce(v_item->>'comments', v_item->>'comment'), '')
@@ -64,7 +64,7 @@ begin
       v_items := v_items || jsonb_build_array(jsonb_build_object(
         'id', v_item_id,
         'evaluation_id', v_evaluation_id,
-        'athlete_id', v_eval->>'athlete_id',
+        'athlete_id', v_item->>'athlete_id',
         'subskill_id', v_item->>'skill_id',
         'rating', v_item_rating,
         'comment', v_item_comment,
