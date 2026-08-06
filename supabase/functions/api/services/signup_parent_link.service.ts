@@ -1,6 +1,6 @@
 import { INVITE_REDIRECT_URL } from "../config/env.ts";
 import { errorResult, SUPABASE_CLIENT_NOT_INITIALIZED, supabaseClientNotInitializedError } from "../utils/errors.ts";
-import { generateInviteLink, sendWelcomeEmail } from "./email.service.ts";
+import { generateRecoveryLink, sendWelcomeEmail } from "./email.service.ts";
 import { sbAdmin } from "./supabase.ts";
 
 export type ParentProfileForLink = {
@@ -303,7 +303,7 @@ export async function createAndInviteParentForAthlete(args: {
 
     try {
       const redirectTo = resolveActivateRedirectUrl() || undefined;
-      const { actionLink } = await generateInviteLink(email, {
+      const { actionLink } = await generateRecoveryLink(email, {
         redirectTo,
         data: {
           activation: "parent_invite",

@@ -242,6 +242,13 @@ export async function generateInviteLink(
   return await generateAuthLink(email, { ...options, type: "invite" });
 }
 
+export async function generateRecoveryLink(
+  email: string,
+  options: Omit<AuthLinkOptions, "type"> = {},
+): Promise<{ actionLink: string; userId: string | null }> {
+  return await generateAuthLink(email, { ...options, type: "recovery" });
+}
+
 export async function generateMagicLink(
   email: string,
   options: Omit<AuthLinkOptions, "type"> = {},
