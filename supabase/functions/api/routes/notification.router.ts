@@ -5,14 +5,15 @@ import {
   handleMarkNotificationRead,
   handleMarkAllNotificationsRead,
 } from "../controllers/notification.controller.ts";
+import { authMiddleware } from "../utils/auth.ts";
 
 export function createNotificationsRouter(): Router {
   const router = new Router();
-
-  router.add("GET", "list", handleNotificationsList);
-  router.add("PATCH", "read-all", handleMarkAllNotificationsRead);
-  router.add("GET", ":id", handleNotificationById);
-  router.add("PATCH", ":id/read", handleMarkNotificationRead);
+  const requireAuth = authMiddleware();
+  router.add("GET", "list", handleNotificationsList, [requireAuth]);
+  router.add("PATCH", "read-all", handleMarkAllNotificationsRead, [requireAuth]);
+  router.add("GET", ":id", handleNotificationById, [requireAuth]);
+  router.add("PATCH", ":id/read", handleMarkNotificationRead, [requireAuth]);
 
   return router;
 }

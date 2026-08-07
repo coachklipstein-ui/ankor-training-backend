@@ -313,13 +313,20 @@ async function notifyEvaluationCompletedInternal(params: {
 export async function notifyAthleteJoined(params: {
   org_id: string;
   user_id: string;
-  payload?: Record<string, unknown>;
+  teamName: string;
+  athleteName: string;
+  athleteId: string;
 }) {
   return createNotification({
     org_id: params.org_id,
     user_id: params.user_id,
     type: "athlete_joined",
-    payload: params.payload ?? null,
+    payload: {
+      title: `New member joined ${params.teamName}`,
+      description: `${params.athleteName} joined ${params.teamName} using your Easy Join code`,
+      topic: "athlete_joined",
+      link: `/athletes/${params.athleteId}`,
+    },
   });
 }
 

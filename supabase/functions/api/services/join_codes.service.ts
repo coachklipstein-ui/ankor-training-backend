@@ -90,6 +90,7 @@ export async function createJoinCode(
     expires_at: input.expires_at,
     is_active: input.is_active ?? true,
     disabled: input.disabled ?? false,
+    created_by: input.created_by ?? null, 
   };
 
   const { data, error } = await sbAdmin.from("join_codes").insert(payload).select(SELECT_FIELDS).maybeSingle();

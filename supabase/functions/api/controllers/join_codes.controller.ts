@@ -95,7 +95,8 @@ export async function getJoinCodeController(
 }
 
 export async function createJoinCodeController(req: Request, _origin?: string | null, 
-  ctx?: RequestContext): Promise<Response> {
+  _params?: Record<string, string>,
+   _ctx?: RequestContext): Promise<Response> {
   if (req.method !== "POST") {
     return methodNotAllowed(["POST"]);
   }
@@ -114,6 +115,7 @@ export async function createJoinCodeController(req: Request, _origin?: string | 
     return badRequest(message);
   }
 
+  parsed.data.created_by = _ctx?.user?.id ?? null; 
   const { data, error } = await createJoinCode(parsed.data);
   if (error) {
     console.error("[createJoinCodeController] create error", error);
