@@ -1,4 +1,4 @@
-import { z } from "https://esm.sh/zod@3.23.8";
+import { z } from "zod";
 import { RE_UUID } from "../utils/uuid.ts";
 
 const uuid = () => z.string().regex(RE_UUID, "Invalid UUID");
@@ -7,7 +7,9 @@ const PlanVisibilitySchema = z.enum(["private", "org", "shared", "prebuilt"]);
 const PlanStatusSchema = z.enum(["draft", "published", "archived"]);
 const PlanItemTypeSchema = z.enum(["drill", "note", "rest", "custom"]);
 
-export const PlanListTypeSchema = z.enum(["prebuild", "custom"]);
+export const PlanListTypeSchema = z.enum(["prebuild", "custom", "org"]);
+/** Stored `practice_plans.type` values (not list-only modes like `org`). */
+export const PlanRecordTypeSchema = z.enum(["prebuild", "custom"]);
 
 export const PlanListFilterSchema = z
   .object({
@@ -18,11 +20,11 @@ export const PlanListFilterSchema = z
     offset: z.number({ coerce: true }).int().min(0).optional().default(0),
   })
   .superRefine((value, ctx) => {
-    if (value.type === "custom-plans" && !value.user_id) {
+    if (value.type === "custom" && !value.user_id) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["user_id"],
-        message: "user_id (UUID) is required for type=custom-plans",
+        message: "user_id (UUID) is required for type=custom",
       });
     }
   });
@@ -73,7 +75,7 @@ export const PlanItemSchema = z
 export const CreatePlanSchema = z.object({
   owner_user_id: uuid(),
   org_id: uuid().optional().nullable(),
-  type: PlanListTypeSchema.default("custom"),
+  type: PlanRecordTypeSchema.default("custom"),
   name: z.string().trim().min(1, "name is required").max(200),
   description: z.string().trim().max(4000).optional().nullable(),
   visibility: PlanVisibilitySchema.optional(),
