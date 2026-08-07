@@ -1,4 +1,5 @@
 import { sbAdmin } from "./supabase.ts";
+import { createNotification, notifyPlanShared } from "./notification.service.ts";
 import type {
   CreatePlanInput,
   InvitedPlanDto,
@@ -11,6 +12,7 @@ import type {
   PlanItemInput,
   UpdatePlanInput,
 } from "../dtos/plans.dto.ts";
+import { getManagedUser } from "./users.service.ts";
 
 const PLAN_SELECT =
   "id, org_id, owner_user_id, name, description, visibility, status, tags, estimated_minutes, created_at, updated_at";
@@ -162,7 +164,7 @@ export async function invitePlanMembers(
 
   const { data: planRow, error: planError } = await client
     .from("practice_plans")
-    .select("id, org_id, owner_user_id")
+    .select("id, org_id, owner_user_id, name")
     .eq("id", plan_id)
     .maybeSingle();
 
@@ -301,6 +303,18 @@ export async function invitePlanMembers(
   const { error: insertError } = await client.from("practice_plan_members").insert(rows);
 
   if (insertError) return { data: null, error: insertError };
+
+  const planName = typeof planRow.name === "string" && planRow.name.trim() ? planRow.name.trim() : "Practice Plan";
+  const {data} = await getManagedUser(invitedBy, orgId);
+  for (const userId of toInvite) {
+    await notifyPlanShared({
+      org_id: orgId,
+      user_id: userId,
+      planName: planName,
+      hostName: data?.full_name ?? "Administrator",
+      plan_id: plan_id,
+    });
+  }
 
   return {
     data: { invited_user_ids: toInvite, skipped_user_ids: skipped },

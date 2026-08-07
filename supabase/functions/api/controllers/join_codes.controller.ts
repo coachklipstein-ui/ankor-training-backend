@@ -94,7 +94,8 @@ export async function getJoinCodeController(
   return json(200, { ok: true, join_code: data });
 }
 
-export async function createJoinCodeController(req: Request, _origin?: string | null): Promise<Response> {
+export async function createJoinCodeController(req: Request, _origin?: string | null, 
+  ctx?: RequestContext): Promise<Response> {
   if (req.method !== "POST") {
     return methodNotAllowed(["POST"]);
   }

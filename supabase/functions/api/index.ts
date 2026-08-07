@@ -26,6 +26,7 @@ import { createUsersRouter } from "./routes/users.router.ts";
 import { createJoinCodesRouter } from "./routes/join_codes.router.ts";
 import { createPositionsRouter } from "./routes/positions.router.ts";
 import { createSportsRouter } from "./routes/sports.router.ts";
+import { createNotificationsRouter } from "./routes/notification.router.ts";
 import { authMiddleware } from "./utils/auth.ts";
 
 const router = new Router();
@@ -49,6 +50,7 @@ router.use("users", createUsersRouter(), [requireAuth]);
 router.use("join-codes", createJoinCodesRouter(), [requireAuth]);
 router.use("positions", createPositionsRouter());
 router.use("sports", createSportsRouter());
+router.use("notifications", createNotificationsRouter(), [requireAuth]);
 
 Deno.serve(async (req) => {
   const origin = req.headers.get("Origin") ?? "*";

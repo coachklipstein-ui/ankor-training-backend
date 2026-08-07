@@ -1592,11 +1592,11 @@ function formatEvaluationReportDate(value: string | null): string {
 
 function buildEvaluationLink(evaluationId: string): string {
   const base = (INVITE_REDIRECT_URL ?? "").trim().replace(/\/+$/g, "");
-  if (!base) return evaluationId;
+  if (!base) return `/reports/evaluation-reports/${evaluationId}`;
   return `${base}/reports/evaluation-reports/${evaluationId}`;
 }
 
-async function getEvaluationReportContext(evaluationId: string, org_id: string): Promise<EvaluationReportContext> {
+export async function getEvaluationReportContext(evaluationId: string, org_id: string): Promise<EvaluationReportContext> {
   const client = sbAdmin;
   if (!client) {
     throw new Error("Supabase client not initialized");
@@ -1634,7 +1634,7 @@ async function getEvaluationReportContext(evaluationId: string, org_id: string):
   const coachName =
     typeof data?.coach?.full_name === "string" && data.coach.full_name.trim()
       ? data.coach.full_name.trim()
-      : "your coach";
+      : "Administrator";
 
   const evaluationTitle =
     typeof data?.template?.name === "string" && data.template.name.trim() ? data.template.name.trim() : "Evaluation";
