@@ -6,6 +6,7 @@ import {
   type ListOrganizationsFilters,
   type UpdateOrganizationInput,
 } from "../services/org.service.ts";
+import { rpcRegisterOrg } from "../services/signup.organization.service.ts";
 import {
   badRequest as httpBadRequest,
   internalError,
@@ -63,7 +64,7 @@ export async function handleOrgSignup(req: Request, origin: string | null) {
   const userId = created.user.id;
   const teamNames = teams.map((t) => t?.name?.trim()).filter(Boolean);
 
-  const rpcArgs = {
+  const { data: rpcData, error: rpcErr } = await rpcRegisterOrg({
     p_user_id: userId,
     p_first_name: admin.firstName,
     p_last_name: admin.lastName,
@@ -73,36 +74,7 @@ export async function handleOrgSignup(req: Request, origin: string | null) {
     p_program_gender: org.programGender,
     p_team_names: teamNames,
     p_sport_id: sportId,
-  };
-
-  let { data: rpcData, error: rpcErr } = await sbAdmin!.rpc("signup_register_org_tx", rpcArgs);
-
-  const rpcMessage = String(rpcErr?.message ?? "").toLowerCase();
-  const shouldRetryWithoutSportId =
-    Boolean(rpcErr) &&
-    rpcMessage.includes("could not find the function") &&
-    rpcMessage.includes("signup_register_org_tx") &&
-    rpcMessage.includes("p_sport_id");
-
-  if (shouldRetryWithoutSportId) {
-    const { p_sport_id: _sportId, ...legacyRpcArgs } = rpcArgs;
-    const legacyResult = await sbAdmin!.rpc("signup_register_org_tx", legacyRpcArgs);
-    rpcData = legacyResult.data;
-    rpcErr = legacyResult.error;
-
-    const createdOrgId = Array.isArray(rpcData) ? rpcData[0]?.org_id : null;
-    if (!rpcErr && sportId && createdOrgId) {
-      const { error: sportUpdateErr } = await sbAdmin!
-        .from("organizations")
-        .update({ sport_id: sportId })
-        .eq("id", createdOrgId);
-
-      if (sportUpdateErr) {
-        await sbAdmin!.auth.admin.deleteUser(userId).catch(() => {});
-        return serverError(`Signup failed: ${sportUpdateErr.message}`, origin);
-      }
-    }
-  }
+  });
 
   if (rpcErr || !rpcData?.length) {
     await sbAdmin!.auth.admin.deleteUser(userId).catch(() => {});
