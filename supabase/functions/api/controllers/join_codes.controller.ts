@@ -115,8 +115,7 @@ export async function createJoinCodeController(req: Request, _origin?: string | 
     return badRequest(message);
   }
 
-  parsed.data.created_by = _ctx?.user?.id ?? null; 
-  const { data, error } = await createJoinCode(parsed.data);
+  const { data, error } = await createJoinCode(parsed.data, _ctx?.user?.id ?? null);
   if (error) {
     console.error("[createJoinCodeController] create error", error);
     return internalError(error, "Failed to create join code");

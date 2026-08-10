@@ -8,6 +8,10 @@ export async function rpcRegisterAthlete(args: Record<string, unknown>) {
   }
   const result = await client!.rpc("signup_register_athlete_with_code_tx", args);
 
+  if(!result.success) {
+    throw new Error(`Error registering athlete: ${result.error}`);
+  }
+  
   const { data: code_data, error: teamError } = await client
     .from("join_codes")
     .select(
@@ -61,6 +65,10 @@ export async function rpcRegisterCoach(args: Record<string, unknown>) {
   }
 
   const result = await client!.rpc("signup_register_coach_with_code_tx", args);
+  if(!result.success) {
+    throw new Error(`Error registering coach: ${result.error}`);
+  }
+
   const { data: code_data, error: teamError } = await client
     .from("join_codes")
     .select(

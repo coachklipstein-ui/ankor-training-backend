@@ -35,10 +35,7 @@ export async function handleNotificationsList(
 ): Promise<Response> {
   if (req.method !== "GET") return methodNotAllowed(["GET"]);
 
-  const userId = ctx?.user?.id;
-  if (!userId) {
-    return badRequest("Authentication required");
-  }
+  const userId = ctx!.user!.id!;
 
   const url = new URL(req.url);
 

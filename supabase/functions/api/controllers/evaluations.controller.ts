@@ -19,7 +19,7 @@ import {
   buildEvaluationReportEmailInputs,
 } from "../services/evaluations.service.ts";
 import { sendBulkEvaluationReportEmails } from "../services/email.service.ts";
-import { buildEvaluationNotificationInputs, notifyEvaluationCompleted} from "../services/notification.service.ts";
+import { notifyEvaluationCompleted} from "../services/notification.service.ts";
 import { badRequest, created, internalError, methodNotAllowed, json } from "../utils/http.ts";
 import { EvaluationDetailDto, type EvaluationMatrixUpdateDto } from "../dtos/evaluations.dto.ts";
 import { jsonResponse } from "../utils/http.ts";
@@ -1096,7 +1096,7 @@ export async function handleSubmitEvaluation(
       }
     } catch (emailErr) {
       console.error("[handleSubmitEvaluation] email send error", emailErr);
-    }   
+    }
 
     return jsonResponse({ ok: true, data: result.data }, { status: 200 });
   } catch (err) {

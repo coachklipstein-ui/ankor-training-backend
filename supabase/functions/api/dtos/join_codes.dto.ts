@@ -30,7 +30,6 @@ export const CreateJoinCodeSchema = z.object({
   expires_at: dateString(),
   is_active: z.boolean().optional().default(true),
   disabled: z.boolean().optional().default(false),
-  created_by: uuid().optional().nullable(),
 });
 
 export const UpdateJoinCodeSchema = z

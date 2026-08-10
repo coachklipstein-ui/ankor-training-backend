@@ -225,29 +225,6 @@ export async function markAllNotificationsAsRead(
   return { count: count ?? 0, error: null };
 }
 
-
-export async function deleteNotification(
-  id: string,
-): Promise<{ data: { id: string } | null; error: unknown }> {
-  const client = sbAdmin;
-  if (!client) {
-    return { data: null, error: new Error("Supabase client not initialized") };
-  }
-
-  const { data, error } = await client
-    .from("notifications")
-    .delete()
-    .eq("id", id)
-    .select("id");
-
-  if (error) return { data: null, error };
-  if (!data || data.length === 0) {
-    return { data: null, error: new Error("Notification not found") };
-  }
-
-  return { data: { id: data[0].id }, error: null };
-}
-
 export async function notifyEvaluationCompleted(
   evaluationId: string,
   org_id: string) {
@@ -271,25 +248,25 @@ export async function notifyEvaluationCompleted(
       link: context.evaluationLink,
     }));
 
-      if (items.length > 0) {
-        items.forEach(async (item) => {
-          const notifResult = await notifyEvaluationCompletedInternal({
-            org_id: item.org_id,
-            user_id: item.user_id,
-            evaluation_id: item.evaluation_id,
-            payload: {
-              title: item.title,
-              description: item.description,
-              topic: item.topic,
-              link: item.link,
-            },
-          });
+   if (items.length > 0) {
+     Promise.all(items.map(async (item): Promise<void> => {
+       const notifResult = await notifyEvaluationCompletedInternal({
+         org_id: item.org_id,
+         user_id: item.user_id,
+         evaluation_id: item.evaluation_id,
+         payload: {
+           title: item.title,
+           description: item.description,
+           topic: item.topic,
+           link: item.link,
+         },
+       });
 
-          if (notifResult.error) {
-            console.error("[handleSubmitEvaluation] notification insert error", notifResult.error);
-          }
-        });
-      }
+       if (notifResult.error) {
+         console.error("[handleSubmitEvaluation] notification insert error", notifResult.error);
+       }
+     }))
+   }
   } catch (err) {
     return { data: [], error: err };
   }
@@ -426,14 +403,14 @@ async function listEvaluationNotificationRecipients(
     if (!athleteResult.error && athleteResult.data && athleteResult.data.parent) {
       const parent = athleteResult.data.parent;
       if (parent.email && parent.full_name) {
-        const { data: profileRow } = await client
+        const { data: parentProfileRow } = await client
           .from("profiles")
           .select("user_id, full_name")
           .eq("email", parent.email)
           .maybeSingle();
 
-        if (profileRow) {
-          recipients.push({ user_id: profileRow.user_id, full_name: profileRow.full_name });
+        if (parentProfileRow) {
+          recipients.push({ user_id: parentProfileRow.user_id, full_name: full_name });
         }
       }
     }
@@ -451,33 +428,3 @@ export type EvaluationNotificationInput = {
   topic: string;
   link: string;
 };
-
-export async function buildEvaluationNotificationInputs(
-  evaluationId: string,
-  org_id: string,
-): Promise<{ data: EvaluationNotificationInput[]; error: unknown | null }> {
-  try {
-    const [context, recipients] = await Promise.all([
-      getEvaluationReportContext(evaluationId, org_id),
-      listEvaluationNotificationRecipients(evaluationId),
-    ]);
-
-    if (recipients.length === 0) {
-      return { data: [], error: null };
-    }
-
-    const items: EvaluationNotificationInput[] = recipients.map((recipient) => ({
-      user_id: recipient.user_id,
-      evaluation_id: evaluationId,
-      org_id,
-      title: `New evaluation available for ${recipient.first_name}`,
-      description: `${context.coachName} submitted a new evaluation - ${context.evaluationTitle} - for ${recipient.first_name}, on ${context.evaluationDate}.`,
-      topic: "evaluation_completed",
-      link: context.evaluationLink,
-    }));
-
-    return { data: items, error: null };
-  } catch (err) {
-    return { data: [], error: err };
-  }
-}
