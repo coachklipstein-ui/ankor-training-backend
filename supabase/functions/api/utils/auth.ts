@@ -1,14 +1,10 @@
 import type { Middleware, RequestContext } from "../routes/router.ts";
 import { sbAdmin, sbAnon } from "../services/supabase.ts";
-import {
-  getOrgRole,
-  hasRoleAccess,
-  type OrgRole,
-} from "./roles.ts";
+import { getOrgRole, hasRoleAccess, isPlatformAdminRole, type OrgRole } from "./roles.ts";
 import { forbidden, unauthorized } from "./http.ts";
 
 export type { OrgRole } from "./roles.ts";
-export { isAdminRole } from "./roles.ts";
+export { isOrgAdminRole } from "./roles.ts";
 
 export type AuthUser = {
   id: string;
@@ -62,9 +58,9 @@ export async function requireSysAdmin(user: AuthUser): Promise<{ ok: true } | { 
   return { ok: true };
 }
 
-export async function requireAdminOrSysAdmin(user: AuthUser): Promise<{ ok: true } | { response: Response }> {
+export async function requireAnyAdmin(user: AuthUser): Promise<{ ok: true } | { response: Response }> {
   const appRole = typeof user.app_metadata?.role === "string" ? user.app_metadata.role.trim().toLowerCase() : "";
-  if (appRole === "admin" || appRole === "sys-admin") return { ok: true };
+  if (isPlatformAdminRole(appRole)) return { ok: true };
 
   const client = sbAdmin;
   if (!client) return { response: forbidden("Auth admin client not configured") };
@@ -75,7 +71,7 @@ export async function requireAdminOrSysAdmin(user: AuthUser): Promise<{ ok: true
 
   const profileRole = typeof data?.role === "string" ? data.role.trim().toLowerCase() : "";
 
-  if (profileRole !== "admin" && profileRole !== "sys-admin") {
+  if (!isPlatformAdminRole(profileRole)) {
     return { response: forbidden("Only admin or sys-admin users can perform this action") };
   }
 

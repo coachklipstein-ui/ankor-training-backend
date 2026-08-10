@@ -59,9 +59,9 @@ export const registerOrganization = async (
     user_metadata: {
       first_name: admin.firstName,
       last_name: admin.lastName,
-      role: "admin",
+      role: "owner",
     },
-    app_metadata: { role: "admin" },
+    app_metadata: { role: "owner" },
   });
 
   if (createErr || !created?.user) {

@@ -6,27 +6,12 @@ import {
   PlanListFilterSchema,
   UpdatePlanSchema,
 } from "../dtos/plans.dto.ts";
-import {
-  createPlan,
-  getPlanById,
-  invitePlanMembers,
-  listInvitedPlans,
-  listPlansByType,
-  updatePlan,
-} from "../services/plans.service.ts";
-import {
-  badRequest,
-  created,
-  internalError,
-  json,
-  methodNotAllowed,
-  notFound,
-  forbidden,
-  unauthorized,
-} from "../utils/http.ts";
+import { createPlan, getPlanById, invitePlanMembers, listInvitedPlans, listPlansByType, updatePlan } from "../services/plans.service.ts";
+import { badRequest, created, internalError, json, methodNotAllowed, notFound, forbidden, unauthorized } from "../utils/http.ts";
 import type { RequestContext, RouteParams } from "../routes/router.ts";
-import { isAdminRole, type OrgRole } from "../utils/auth.ts";
+import { type OrgRole } from "../utils/auth.ts";
 import { RE_UUID } from "../utils/uuid.ts";
+import { isPlatformAdminRole } from "../utils/roles.ts";
 
 function qp(url: URL, key: string): string | undefined {
   const value = url.searchParams.get(key);
@@ -61,7 +46,7 @@ export async function listPlansController(
 
   if (parsed.data.type === "org") {
     const role = ctx?.org_role as OrgRole | undefined;
-    if (!role || !isAdminRole(role)) {
+    if (!role || !isPlatformAdminRole(role)) {
       return forbidden("Only organization admins can list all org plans");
     }
   }
