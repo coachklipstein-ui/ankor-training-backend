@@ -26,7 +26,7 @@ export function createDrillsRouter(): Router {
   router.add("GET", "list", listDrillsController, [orgRoleGuardFromQuery("org_id", ["coach", "athlete", "parent"])]);
   router.add("GET", "segments", listSegmentsController);
   router.add("GET", "tags", listDrillTagsController, [orgRoleGuardFromQuery("org_id", ["coach", "athlete", "parent"])]);
-  router.add("PATCH", ":id", updateDrillController);
+  router.add("PATCH", ":id", updateDrillController, [orgRoleGuardFromQuery("org_id", ["coach"])]);
   router.add("GET", ":id", getDrillByIdController, [orgRoleGuardFromQuery("org_id", ["coach", "athlete", "parent"])]);
 
   return router;
