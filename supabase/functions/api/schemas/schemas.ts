@@ -62,6 +62,36 @@ export const ActivateParentSchema = z.object({
 });
 export type ActivateParentInput = z.infer<typeof ActivateParentSchema>;
 
+// ---- Organization signup ----
+const ProgramGenderSchema = z.enum(["girls", "boys", "coed"]);
+
+export const OrgSignupSchema = z.object({
+  admin: z.object({
+    firstName: z.string().trim().min(1, "Admin first name is required"),
+    lastName: z.string().trim().min(1, "Admin last name is required"),
+    email: z.string().trim().email("Invalid admin email"),
+    phone: z.preprocess((val) => {
+      if (val == null) return null;
+      if (typeof val === "string") return val.trim() === "" ? null : val.trim();
+      return val;
+    }, z.string().nullable().optional()),
+    password: passwordSchema,
+  }),
+  organization: z.object({
+    name: z.string().trim().min(1, "Organization name is required"),
+    programGender: ProgramGenderSchema,
+  }),
+  sport_id: uuid(),
+  teams: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1),
+      }),
+    )
+    .default([]),
+});
+export type OrgSignupInput = z.infer<typeof OrgSignupSchema>;
+
 // ---- Scorecard template (create) ----
 export const SubskillInputSchema = z.object({
   name: z.string().trim().min(1),

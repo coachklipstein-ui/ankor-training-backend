@@ -1,8 +1,7 @@
+import { isOrgRole, type OrgRole } from "../utils/roles.ts";
 import { sbAdmin } from "./supabase.ts";
 
-const MANAGED_ORG_ROLES = ["owner", "admin", "coach", "athlete", "parent", "staff", "viewer"] as const;
-
-export type ManagedOrgRole = (typeof MANAGED_ORG_ROLES)[number];
+export type ManagedOrgRole = OrgRole;
 
 export type OrgUserDto = {
   user_id: string;
@@ -52,7 +51,7 @@ export type UpdateManagedUserInput = {
 };
 
 export function isManagedOrgRole(value: string): value is ManagedOrgRole {
-  return MANAGED_ORG_ROLES.includes(value as ManagedOrgRole);
+  return isOrgRole(value);
 }
 
 function mapPhone(row: any): string | null {

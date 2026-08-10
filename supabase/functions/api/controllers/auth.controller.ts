@@ -2,6 +2,7 @@ import { ActivateParentSchema, SignUpSchema } from "../schemas/schemas.ts";
 import { json, badRequest, conflict, notFound, serverError } from "../utils/responses.ts";
 import { AuthLoginSchema } from "../schemas/schemas.ts";
 import { sbAdmin, sbAnon } from "../services/supabase.ts";
+import { resolveLoginUser } from "../services/auth.service.ts";
 import { rpcRegisterAthlete, rpcRegisterCoach, rpcRegisterParent } from "../services/signup.service..ts";
 import {
   activateParentProfile,
@@ -307,97 +308,13 @@ export async function handleAuthLogin(req: Request, origin: string | null) {
     return json({ ok: false, error: "Token does not match user" }, origin, 401);
   }
 
-  if (!sbAdmin) return serverError("Database client not configured", origin);
-
-  const { data: profile, error: profileErr } = await sbAdmin
-    .from("profiles")
-    .select("id, email, full_name, role, default_org_id")
-    .eq("id", parsed.data.user_id)
-    .maybeSingle();
-
-  if (profileErr) {
-    return serverError(`Failed to load profile: ${profileErr.message}`, origin);
-  }
-  if (!profile) return notFound("Profile not found", origin);
-
-  const profileUserId = typeof profile.id === "string" ? profile.id.trim() : "";
-  const profileOrgId = typeof profile.default_org_id === "string" ? profile.default_org_id.trim() : "";
-  let effectiveRole = profile.role ?? null;
-
-  if (profileOrgId && profileUserId && effectiveRole !== "parent") {
-    const { data: athleteRow, error: athleteErr } = await sbAdmin
-      .from("athletes")
-      .select("email")
-      .eq("org_id", profileOrgId)
-      .eq("user_id", profileUserId)
-      .maybeSingle();
-
-    if (athleteErr) {
-      return serverError(`Failed to load athlete: ${athleteErr.message}`, origin);
-    }
-
-    const { data: guardianRow, error: guardianErr } = await sbAdmin
-      .from("guardian_contacts")
-      .select("email")
-      .eq("org_id", profileOrgId)
-      .eq("user_id", profileUserId)
-      .maybeSingle();
-
-    if (guardianErr) {
-      return serverError(`Failed to load guardian: ${guardianErr.message}`, origin);
-    }
-
-    const athleteEmail = athleteRow?.email?.trim().toLowerCase() ?? "";
-    const guardianEmail = guardianRow?.email?.trim().toLowerCase() ?? "";
-    if (athleteEmail && guardianEmail && athleteEmail === guardianEmail) {
-      effectiveRole = "parent";
-    }
+  const resolved = await resolveLoginUser(parsed.data.user_id);
+  if (!resolved.ok) {
+    if (resolved.code === "not_found") return notFound(resolved.message, origin);
+    return serverError(resolved.message, origin);
   }
 
-  let coach_id: string | null = null;
-  let athlete_id: string | null = null;
-
-  if (effectiveRole === "coach" && profileUserId) {
-    const { data: coachRow, error: coachErr } = await sbAdmin
-      .from("coaches")
-      .select("id")
-      .eq("user_id", profileUserId)
-      .maybeSingle();
-
-    if (coachErr) {
-      return serverError(`Failed to load coach: ${coachErr.message}`, origin);
-    }
-
-    coach_id = coachRow?.id ?? null;
-  } else if (effectiveRole === "athlete" && profileUserId) {
-    const { data: athleteRow, error: athleteErr } = await sbAdmin
-      .from("athletes")
-      .select("id")
-      .eq("user_id", profileUserId)
-      .maybeSingle();
-
-    if (athleteErr) {
-      return serverError(`Failed to load athlete: ${athleteErr.message}`, origin);
-    }
-
-    athlete_id = athleteRow?.id ?? null;
-  }
-
-  return json(
-    {
-      ok: true,
-      user: {
-        id: profile.id,
-        full_name: profile.full_name ?? null,
-        email: profile.email,
-        role: effectiveRole,
-        default_org_id: profile.default_org_id ?? null,
-        coach_id,
-        athlete_id,
-      },
-    },
-    origin,
-  );
+  return json({ ok: true, user: resolved.data }, origin);
 }
 
 function readStringField(body: Record<string, unknown>, ...keys: string[]): string {

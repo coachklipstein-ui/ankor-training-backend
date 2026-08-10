@@ -1,4 +1,3 @@
-import { sbAdmin } from "../services/supabase.ts";
 import {
   getOrganizationById,
   listOrganizations,
@@ -6,6 +5,8 @@ import {
   type ListOrganizationsFilters,
   type UpdateOrganizationInput,
 } from "../services/org.service.ts";
+import { registerOrganization } from "../services/signup.organization.service.ts";
+import { OrgSignupSchema } from "../schemas/schemas.ts";
 import {
   badRequest as httpBadRequest,
   internalError,
@@ -13,105 +14,37 @@ import {
   methodNotAllowed,
   notFound,
 } from "../utils/http.ts";
-import { badRequest, json, serverError } from "../utils/responses.ts";
+import { badRequest, conflict, json, serverError } from "../utils/responses.ts";
 import { RE_UUID } from "../utils/uuid.ts";
 import { RequestContext } from "../routes/router.ts";
-
-type Body = {
-  admin: { firstName: string; lastName: string; email: string; phone?: string | null; password: string };
-  organization: { name: string; programGender: "girls" | "boys" | "coed"; sport_id?: string | null };
-  sport_id?: string | null;
-  teams?: Array<{ name: string }>;
-};
 
 const PROGRAM_GENDERS = ["girls", "boys", "coed"] as const;
 
 export async function handleOrgSignup(req: Request, origin: string | null) {
   if (req.method !== "POST") return badRequest("Method not allowed", origin);
 
-  const body = (await req.json().catch(() => null)) as Body | null;
-  if (!body) return badRequest("Invalid JSON body", origin);
-
-  const admin = body.admin;
-  const org = body.organization;
-  const teams = body.teams ?? [];
-  if (!admin?.firstName || !admin?.lastName || !admin?.email || !admin?.password) {
-    return badRequest("Missing admin fields", origin);
-  }
-  if (!org?.name || !PROGRAM_GENDERS.includes(org.programGender)) {
-    return badRequest("Invalid organization data", origin);
-  }
-  const sportId = (org.sport_id ?? body.sport_id)?.trim() || null;
-  if (sportId && !RE_UUID.test(sportId)) {
-    return badRequest("sport_id must be a UUID if provided", origin);
+  const payload = await req.json().catch(() => null);
+  const parsed = OrgSignupSchema.safeParse(payload);
+  if (!parsed.success) {
+    const msg = parsed.error.issues.map((issue) => issue.message).join("; ");
+    return badRequest(msg, origin);
   }
 
-  const { data: created, error: createErr } = await sbAdmin!.auth.admin.createUser({
-    email: admin.email,
-    password: admin.password,
-    email_confirm: true,
-    user_metadata: {
-      first_name: admin.firstName,
-      last_name: admin.lastName,
-      role: "admin",
-    },
-  });
-  if (createErr || !created?.user) {
-    return badRequest(`Could not create user: ${createErr?.message}`, origin);
+  const result = await registerOrganization(parsed.data);
+  if (!result.ok) {
+    if (result.code === "email_taken") return conflict(result.message, origin);
+    if (result.code === "create_user_failed") return badRequest(`Could not create user: ${result.message}`, origin);
+    return serverError(`Signup failed: ${result.message}`, origin);
   }
 
-  const userId = created.user.id;
-  const teamNames = teams.map((t) => t?.name?.trim()).filter(Boolean);
-
-  const rpcArgs = {
-    p_user_id: userId,
-    p_first_name: admin.firstName,
-    p_last_name: admin.lastName,
-    p_email: admin.email,
-    p_phone: admin.phone ?? null,
-    p_org_name: org.name,
-    p_program_gender: org.programGender,
-    p_team_names: teamNames,
-    p_sport_id: sportId,
-  };
-
-  let { data: rpcData, error: rpcErr } = await sbAdmin!.rpc("signup_register_org_tx", rpcArgs);
-
-  const rpcMessage = String(rpcErr?.message ?? "").toLowerCase();
-  const shouldRetryWithoutSportId =
-    Boolean(rpcErr) &&
-    rpcMessage.includes("could not find the function") &&
-    rpcMessage.includes("signup_register_org_tx") &&
-    rpcMessage.includes("p_sport_id");
-
-  if (shouldRetryWithoutSportId) {
-    const { p_sport_id: _sportId, ...legacyRpcArgs } = rpcArgs;
-    const legacyResult = await sbAdmin!.rpc("signup_register_org_tx", legacyRpcArgs);
-    rpcData = legacyResult.data;
-    rpcErr = legacyResult.error;
-
-    const createdOrgId = Array.isArray(rpcData) ? rpcData[0]?.org_id : null;
-    if (!rpcErr && sportId && createdOrgId) {
-      const { error: sportUpdateErr } = await sbAdmin!
-        .from("organizations")
-        .update({ sport_id: sportId })
-        .eq("id", createdOrgId);
-
-      if (sportUpdateErr) {
-        await sbAdmin!.auth.admin.deleteUser(userId).catch(() => {});
-        return serverError(`Signup failed: ${sportUpdateErr.message}`, origin);
-      }
-    }
-  }
-
-  if (rpcErr || !rpcData?.length) {
-    await sbAdmin!.auth.admin.deleteUser(userId).catch(() => {});
-    return serverError(`Signup failed: ${rpcErr?.message ?? "RPC returned no data"}`, origin);
-  }
-
-  const result = rpcData[0];
   return json(
-    { ok: true, userId, orgId: result.org_id, profileId: result.profile_id, teamIds: result.team_ids ?? [] },
+    {
+      ok: true,
+      userId: result.userId,
+      orgId: result.orgId,
+      profileId: result.profileId,
+      teamIds: result.teamIds,
+    },
     origin,
     201,
   );
