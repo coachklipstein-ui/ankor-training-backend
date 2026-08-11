@@ -3,7 +3,7 @@ import { json, badRequest, conflict, notFound, serverError } from "../utils/resp
 import { AuthLoginSchema } from "../schemas/schemas.ts";
 import { sbAdmin, sbAnon } from "../services/supabase.ts";
 import { resolveLoginUser } from "../services/auth.service.ts";
-import { rpcRegisterAthlete, rpcRegisterCoach, rpcRegisterParent } from "../services/signup.service..ts";
+import { registerAthlete, registerCoach, rpcRegisterParent } from "../services/signup.service..ts";
 import {
   activateParentProfile,
   createAndInviteParentForAthlete,
@@ -100,7 +100,7 @@ export async function handleAuthSignup(req: Request, origin: string | null) {
         p_positions: positionIds,
         p_terms_accepted: true,
       };
-      var { data: txData, error: txErr } = await rpcRegisterAthlete(rpcArgs);
+      var { data: txData, error: txErr } = await registerAthlete(rpcArgs);
     } else if (base.role === "coach") {
       rpcName = "signup_register_coach_with_code_tx";
       rpcArgs = {
@@ -112,7 +112,7 @@ export async function handleAuthSignup(req: Request, origin: string | null) {
         p_cell_number: base.cellNumber ?? null,
         p_terms_accepted: true,
       };
-      var { data: txData, error: txErr } = await rpcRegisterCoach(rpcArgs);
+      var { data: txData, error: txErr } = await registerCoach(rpcArgs);
     } else {
       rpcName = "signup_register_parent_with_code_tx";
       rpcArgs = {

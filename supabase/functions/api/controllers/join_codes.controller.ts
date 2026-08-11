@@ -94,7 +94,9 @@ export async function getJoinCodeController(
   return json(200, { ok: true, join_code: data });
 }
 
-export async function createJoinCodeController(req: Request, _origin?: string | null): Promise<Response> {
+export async function createJoinCodeController(req: Request, _origin?: string | null, 
+  _params?: Record<string, string>,
+   _ctx?: RequestContext): Promise<Response> {
   if (req.method !== "POST") {
     return methodNotAllowed(["POST"]);
   }
@@ -113,7 +115,7 @@ export async function createJoinCodeController(req: Request, _origin?: string | 
     return badRequest(message);
   }
 
-  const { data, error } = await createJoinCode(parsed.data);
+  const { data, error } = await createJoinCode(parsed.data, _ctx?.user?.id ?? null);
   if (error) {
     console.error("[createJoinCodeController] create error", error);
     return internalError(error, "Failed to create join code");

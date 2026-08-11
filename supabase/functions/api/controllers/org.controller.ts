@@ -156,7 +156,7 @@ function parseUpdateOrganization(body: unknown): { value?: UpdateOrganizationInp
 export async function listOrganizationsController(req: Request,
   _origin?: string | null,
   _params?: Record<string, string>,
-  ctx?: RequestContext,): Promise<Response> {
+  ctx?: RequestContext): Promise<Response> {
   if (req.method !== "GET") return methodNotAllowed(["GET"]);
 
   const parsed = parseListOrganizationsFilters(new URL(req.url), ctx?.user?.id ?? "");

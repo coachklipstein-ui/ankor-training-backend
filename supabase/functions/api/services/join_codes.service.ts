@@ -76,6 +76,7 @@ export async function getJoinCodeByCode(
 
 export async function createJoinCode(
   input: CreateJoinCodeInput,
+  createdBy?: string | null,
 ): Promise<{ data: JoinCodeDto | null; error: unknown }> {
   if (!sbAdmin) {
     return { data: null, error: new Error("Supabase client not initialized") };
@@ -90,6 +91,7 @@ export async function createJoinCode(
     expires_at: input.expires_at,
     is_active: input.is_active ?? true,
     disabled: input.disabled ?? false,
+    created_by: createdBy ?? null,
   };
 
   const { data, error } = await sbAdmin.from("join_codes").insert(payload).select(SELECT_FIELDS).maybeSingle();
