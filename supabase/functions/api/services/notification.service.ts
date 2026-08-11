@@ -265,7 +265,7 @@ export async function notifyEvaluationCompleted(
   try {
     const [context, recipients] = await Promise.all([
       getEvaluationReportContext(evaluationId, org_id),
-      listEvaluationNotificationRecipients(evaluationId),
+      listEvaluationNotificationRecipients(evaluationId, org_id),
     ]);
 
     if (recipients.length === 0) {
@@ -365,6 +365,7 @@ export type EvaluationNotificationRecipient = {
 
 async function listEvaluationNotificationRecipients(
   evaluationId: string,
+  orgId: string,
 ): Promise<EvaluationNotificationRecipient[]> {
   const client = sbAdmin;
   if (!client) {
@@ -393,6 +394,15 @@ async function listEvaluationNotificationRecipients(
   const recipients: EvaluationNotificationRecipient[] = [];
   const seenUserIds = new Set<string>();
 
+  const { data: orgAdmins, error: orgAdminsError } = await client
+    .from("org_memberships")
+    .select(
+      `user_id`,
+    )
+    .eq("org_id", orgId)
+    .eq("role", "admin")
+    .eq("is_active", true);
+
   for (const row of data ?? []) {
     const athlete = (row as any)?.athlete;
     if (!athlete) continue;
@@ -402,9 +412,9 @@ async function listEvaluationNotificationRecipients(
     if (!userId || seenUserIds.has(userId)) continue;
     seenUserIds.add(userId);
 
-    const fullName = trimOrNull(athlete.full_name);
+    const athleteFullName = trimOrNull(athlete.full_name);
 
-    recipients.push({ user_id: userId, full_name: fullName });
+    recipients.push({ user_id: userId, full_name: athleteFullName });
 
     if (row.athlete.athlete_guardians) {
 
@@ -413,12 +423,23 @@ async function listEvaluationNotificationRecipients(
         if (parent && parent.user_id) {
           recipients.push({
             user_id: parent.user_id,
-            full_name: fullName,
+            full_name: athleteFullName,
           });
         }
       }
     }
+
+    //add org admins to recipients 
+    if (orgAdmins) {
+      for (const admin of orgAdmins) {
+        recipients.push({
+          user_id: admin.user_id,
+          full_name: athleteFullName,
+        });
+      }
+    }
   }
+
   return recipients;
 }
 
