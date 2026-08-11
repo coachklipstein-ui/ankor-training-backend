@@ -4,7 +4,7 @@ import { EvaluationDetailDto, type EvaluationMatrixUpdateDto, toEvaluationDetail
 import { INVITE_REDIRECT_URL } from "../config/env.ts";
 import type { EvaluationReportEmailInput } from "./email.service.ts";
 import { getAthleteById } from "./athletes.service.ts";
-import { trimOrNull } from "../utils/entities.ts";
+import { firstOrSelf, normalizeString } from "../utils/normalize.ts";
 
 type SubmitEvaluationResult = { ok: true; data: { id: string; status: string } } | { ok: false; error: unknown };
 
@@ -603,6 +603,7 @@ export async function listEvaluationImprovementSkills(
 
   // evaluation_items.subskill_id may contain either a scorecard_subskills.id
   // or an older direct skills.id value.
+  // prettier-ignore
   const { data: subskills, error: subskillError } = await client
     .from("scorecard_subskills")
     .select("id, skill_id")
@@ -632,6 +633,7 @@ export async function listEvaluationImprovementSkills(
     return { data: [], count: 0, error: null };
   }
 
+  // prettier-ignore
   const { data: skills, error: skillsError } = await client
     .from("skills")
     .select("id, title")
@@ -1379,6 +1381,7 @@ export async function deleteEvaluation(
     return { data: null, error: new Error("Supabase client not initialized") };
   }
 
+  // prettier-ignore
   const { data, error } = await client
     .from("evaluations")
     .delete()
@@ -1429,6 +1432,7 @@ export async function applyEvaluationMatrixUpdateService(dto: EvaluationMatrixUp
   if (dto.notes !== undefined) patch.notes = dto.notes;
 
   if (Object.keys(patch).length > 0) {
+    // prettier-ignore
     const { error: headerError } = await sbAdmin
       .from("evaluations")
       .update(patch)
@@ -1444,6 +1448,7 @@ export async function applyEvaluationMatrixUpdateService(dto: EvaluationMatrixUp
   // 2) Apply item-level operations
   for (const op of dto.operations) {
     if (op.type === "remove_athlete") {
+      // prettier-ignore
       const { error } = await sbAdmin
         .from("evaluation_items")
         .delete()
@@ -1565,6 +1570,7 @@ export async function submitEvaluation(evaluationId: string, org_id: string): Pr
 
 type EvaluationReportRecipient = {
   email: string;
+  athleteId: string;
   athleteFirstName: string | null;
 };
 
@@ -1573,7 +1579,6 @@ type EvaluationReportContext = {
   evaluationDate: string;
   coachName: string;
   teamOrOrgName: string;
-  evaluationLink: string;
 };
 
 function formatEvaluationReportDate(value: string | null): string {
@@ -1591,13 +1596,20 @@ function formatEvaluationReportDate(value: string | null): string {
   }).format(date);
 }
 
-function buildEvaluationLink(evaluationId: string): string {
-  const base = (INVITE_REDIRECT_URL ?? "").trim().replace(/\/+$/g, "");
-  if (!base) return `/reports/evaluation-reports/${evaluationId}`;
-  return `${base}/reports/evaluation-reports/${evaluationId}`;
+/** Relative app path for an evaluation report (safe for in-app RouterLink). */
+export function buildEvaluationLink(evaluationId: string, athleteId: string): string {
+  return `/reports/evaluation-reports/${evaluationId}?athleteId=${encodeURIComponent(athleteId)}`;
 }
 
-export async function getEvaluationReportContext(evaluationId: string, org_id: string): Promise<EvaluationReportContext> {
+function toAbsoluteEvaluationLink(relativePath: string): string {
+  const base = (INVITE_REDIRECT_URL ?? "").trim().replace(/\/+$/g, "");
+  return base ? `${base}${relativePath}` : relativePath;
+}
+
+export async function getEvaluationReportContext(
+  evaluationId: string,
+  org_id: string,
+): Promise<EvaluationReportContext> {
   const client = sbAdmin;
   if (!client) {
     throw new Error("Supabase client not initialized");
@@ -1632,21 +1644,20 @@ export async function getEvaluationReportContext(evaluationId: string, org_id: s
     throw new Error("Evaluation not found");
   }
 
-  const coachName = data?.coach == null ? "Administrator" :
-    trimOrNull(data.coach.full_name) ?? "your coach";
+  const coach = firstOrSelf(data.coach);
+  const coachName = coach == null ? "Administrator" : normalizeString(coach.full_name, "your coach");
 
-  const evaluationTitle =
-    typeof data?.template?.name === "string" && data.template.name.trim() ? data.template.name.trim() : "Evaluation";
+  const template = firstOrSelf(data.template);
+  const evaluationTitle = normalizeString(template?.name, "Evaluation");
 
-  const teamOrOrgName =
-    typeof data?.team?.name === "string" && data.team.name.trim() ? data.team.name.trim() : "your organization";
+  const team = firstOrSelf(data.team);
+  const teamOrOrgName = normalizeString(team?.name, "your organization");
 
   return {
     coachName,
     evaluationTitle,
     evaluationDate: formatEvaluationReportDate(data?.created_at ?? null),
     teamOrOrgName,
-    evaluationLink: buildEvaluationLink(evaluationId),
   };
 }
 
@@ -1699,18 +1710,23 @@ async function listEvaluationReportRecipients(evaluationId: string): Promise<Eva
           ? profileRaw.first_name.trim()
           : null;
 
+    const athleteId = typeof athlete.id === "string" ? athlete.id.trim() : "";
+    if (!athleteId) continue;
+
     recipients.push({
       email: normalizedEmail,
+      athleteId,
       athleteFirstName,
     });
 
-    const athleteResult = await getAthleteById(athlete.id, athlete.org_id);
+    const athleteResult = await getAthleteById(athleteId, athlete.org_id);
 
     if (!athleteResult.error && athleteResult.data && athleteResult.data.parent) {
       const parent = athleteResult.data.parent;
       if (parent.email && parent.full_name) {
         recipients.push({
           email: parent?.email?.toLowerCase(),
+          athleteId,
           athleteFirstName: parent.full_name,
         });
       }
@@ -1741,7 +1757,7 @@ export async function buildEvaluationReportEmailInputs(
       evaluationTitle: context.evaluationTitle,
       evaluationDate: context.evaluationDate,
       teamOrOrgName: context.teamOrOrgName,
-      evaluationLink: context.evaluationLink,
+      evaluationLink: toAbsoluteEvaluationLink(buildEvaluationLink(evaluationId, recipient.athleteId)),
     }));
 
     return { data: items, error: null };

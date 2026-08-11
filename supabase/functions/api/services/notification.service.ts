@@ -1,13 +1,8 @@
 import { sbAdmin } from "./supabase.ts";
-import { getEvaluationReportContext } from "./evaluations.service.ts";
-import { trimOrNull } from "../utils/entities.ts";
+import { buildEvaluationLink, getEvaluationReportContext } from "./evaluations.service.ts";
+import { normalizeString } from "../utils/normalize.ts";
 
-
-export type NotificationType =
-  | "evaluation_completed"
-  | "athlete_joined"
-  | "coach_joined"
-  | "plan_shared";
+export type NotificationType = "evaluation_completed" | "athlete_joined" | "coach_joined" | "plan_shared";
 
 export type NotificationRow = {
   id: string;
@@ -19,7 +14,6 @@ export type NotificationRow = {
   created_at: string;
   read_at: string | null;
 };
-
 
 export type NotificationPayloadBase = {
   title: string;
@@ -131,6 +125,7 @@ export async function createNotifications(
     payload: input.payload ?? null,
   }));
 
+  // prettier-ignore
   const { data, error } = await client
     .from("notifications")
     .insert(rows)
@@ -143,14 +138,13 @@ export async function createNotifications(
   return { data: (data ?? []).map(mapRow), error: null };
 }
 
-export async function getNotificationById(
-  id: string,
-): Promise<{ data: NotificationRow | null; error: unknown }> {
+export async function getNotificationById(id: string): Promise<{ data: NotificationRow | null; error: unknown }> {
   const client = sbAdmin;
   if (!client) {
     return { data: null, error: new Error("Supabase client not initialized") };
   }
 
+  // prettier-ignore
   const { data, error } = await client
     .from("notifications")
     .select("*")
@@ -172,14 +166,9 @@ export async function listNotifications(
     return { data: [], count: 0, error: new Error("Supabase client not initialized") };
   }
 
-  const {
-    user_id,
-    type,
-    unread_only,
-    limit = 50,
-    offset = 0,
-  } = filters;
+  const { user_id, type, unread_only, limit = 50, offset = 0 } = filters;
 
+  // prettier-ignore
   let query = client
     .from("notifications")
     .select("*", { count: "exact" })
@@ -210,14 +199,13 @@ export async function listNotifications(
   };
 }
 
-export async function markNotificationAsRead(
-  id: string,
-): Promise<{ data: NotificationRow | null; error: unknown }> {
+export async function markNotificationAsRead(id: string): Promise<{ data: NotificationRow | null; error: unknown }> {
   const client = sbAdmin;
   if (!client) {
     return { data: null, error: new Error("Supabase client not initialized") };
   }
 
+  // prettier-ignore
   const { data, error } = await client
     .from("notifications")
     .update({ read_at: new Date().toISOString() })
@@ -232,14 +220,15 @@ export async function markNotificationAsRead(
   return { data: mapRow(data), error: null };
 }
 
-export async function markAllNotificationsAsRead(
-  filters: { user_id?: string | null },
-): Promise<{ count: number; error: unknown }> {
+export async function markAllNotificationsAsRead(filters: {
+  user_id?: string | null;
+}): Promise<{ count: number; error: unknown }> {
   const client = sbAdmin;
   if (!client) {
     return { count: 0, error: new Error("Supabase client not initialized") };
   }
 
+  // prettier-ignore
   let query = client
     .from("notifications")
     .update({ read_at: new Date().toISOString() })
@@ -258,10 +247,7 @@ export async function markAllNotificationsAsRead(
   return { count: count ?? 0, error: null };
 }
 
-export async function notifyEvaluationCompleted(
-  evaluationId: string,
-  org_id: string,
-) {
+export async function notifyEvaluationCompleted(evaluationId: string, org_id: string) {
   try {
     const [context, recipients] = await Promise.all([
       getEvaluationReportContext(evaluationId, org_id),
@@ -272,19 +258,18 @@ export async function notifyEvaluationCompleted(
       return { data: [], error: null };
     }
 
-    const inputs: EvaluationCompletedNotificationInput[] =
-      recipients.map((recipient) => ({
-        type: "evaluation_completed",
-        org_id,
-        user_id: recipient.user_id,
-        evaluation_id: evaluationId,
-        payload: {
-          title: `New evaluation available for ${recipient.full_name ?? "athlete"}`,
-          description: `${context.coachName} submitted a new evaluation - ${context.evaluationTitle} - for ${recipient.full_name}, on ${context.evaluationDate}.`,
-          topic: "evaluation_completed",
-          link: context.evaluationLink,
-        },
-      }));
+    const inputs: EvaluationCompletedNotificationInput[] = recipients.map((recipient) => ({
+      type: "evaluation_completed",
+      org_id,
+      user_id: recipient.user_id,
+      evaluation_id: evaluationId,
+      payload: {
+        title: `New evaluation available for ${recipient.full_name ?? "athlete"}`,
+        description: `${context.coachName} submitted a new evaluation - ${context.evaluationTitle} - for ${recipient.full_name}, on ${context.evaluationDate}.`,
+        topic: "evaluation_completed",
+        link: buildEvaluationLink(evaluationId, recipient.athleteId),
+      },
+    }));
 
     const { data, error } = await createNotifications(inputs);
 
@@ -360,6 +345,7 @@ export async function notifyPlanShared(params: {
 
 export type EvaluationNotificationRecipient = {
   user_id: string;
+  athleteId: string;
   full_name: string | null;
 };
 
@@ -396,44 +382,52 @@ async function listEvaluationNotificationRecipients(
 
   const { data: orgAdmins, error: orgAdminsError } = await client
     .from("org_memberships")
-    .select(
-      `user_id`,
-    )
+    .select(`user_id`)
     .eq("org_id", orgId)
     .eq("role", "admin")
     .eq("is_active", true);
+
+  if (orgAdminsError) {
+    throw orgAdminsError;
+  }
 
   for (const row of data ?? []) {
     const athlete = (row as any)?.athlete;
     if (!athlete) continue;
 
-    const userId = trimOrNull(athlete.user_id);
+    const athleteId = normalizeString(athlete.id);
+    if (!athleteId) continue;
 
-    if (!userId || seenUserIds.has(userId)) continue;
-    seenUserIds.add(userId);
+    const userId = normalizeString(athlete.user_id);
+    const athleteFullName = normalizeString(athlete.full_name) || null;
 
-    const athleteFullName = trimOrNull(athlete.full_name);
-
-    recipients.push({ user_id: userId, full_name: athleteFullName });
+    if (userId && !seenUserIds.has(userId)) {
+      seenUserIds.add(userId);
+      recipients.push({ user_id: userId, athleteId, full_name: athleteFullName });
+    }
 
     if (row.athlete.athlete_guardians) {
-
       for (const guardian of row.athlete.athlete_guardians) {
         const parent = guardian?.guardian ?? null;
-        if (parent && parent.user_id) {
+        const parentUserId = normalizeString(parent?.user_id);
+        if (parentUserId) {
           recipients.push({
-            user_id: parent.user_id,
+            user_id: parentUserId,
+            athleteId,
             full_name: athleteFullName,
           });
         }
       }
     }
 
-    //add org admins to recipients 
+    // add org admins to recipients
     if (orgAdmins) {
       for (const admin of orgAdmins) {
+        const adminUserId = normalizeString(admin.user_id);
+        if (!adminUserId) continue;
         recipients.push({
-          user_id: admin.user_id,
+          user_id: adminUserId,
+          athleteId,
           full_name: athleteFullName,
         });
       }
