@@ -1,6 +1,7 @@
 import { sbAdmin } from "./supabase.ts";
 import { getEvaluationReportContext } from "./evaluations.service.ts";
-import { getAthleteById } from "./athletes.service.ts";
+import { trimOrNull } from "../utils/entities.ts";
+
 
 export type NotificationType =
   | "evaluation_completed"
@@ -228,7 +229,7 @@ export async function markAllNotificationsAsRead(
 export async function notifyEvaluationCompleted(
   evaluationId: string,
   org_id: string) {
- try {
+  try {
     const [context, recipients] = await Promise.all([
       getEvaluationReportContext(evaluationId, org_id),
       listEvaluationNotificationRecipients(evaluationId),
@@ -248,25 +249,25 @@ export async function notifyEvaluationCompleted(
       link: context.evaluationLink,
     }));
 
-   if (items.length > 0) {
-     Promise.all(items.map(async (item): Promise<void> => {
-       const notifResult = await notifyEvaluationCompletedInternal({
-         org_id: item.org_id,
-         user_id: item.user_id,
-         evaluation_id: item.evaluation_id,
-         payload: {
-           title: item.title,
-           description: item.description,
-           topic: item.topic,
-           link: item.link,
-         },
-       });
+    if (items.length > 0) {
+      Promise.all(items.map(async (item): Promise<void> => {
+        const notifResult = await notifyEvaluationCompletedInternal({
+          org_id: item.org_id,
+          user_id: item.user_id,
+          evaluation_id: item.evaluation_id,
+          payload: {
+            title: item.title,
+            description: item.description,
+            topic: item.topic,
+            link: item.link,
+          },
+        });
 
-       if (notifResult.error) {
-         console.error("[handleSubmitEvaluation] notification insert error", notifResult.error);
-       }
-     }))
-   }
+        if (notifResult.error) {
+          console.error("[handleSubmitEvaluation] notification insert error", notifResult.error);
+        }
+      }))
+    }
   } catch (err) {
     return { data: [], error: err };
   }
@@ -368,8 +369,8 @@ async function listEvaluationNotificationRecipients(
         id,
         user_id,
         org_id,
-        first_name,
-        full_name
+        full_name,
+        athlete_guardians(guardian:guardian_contacts(full_name, user_id, email))
       )
     `,
     )
@@ -386,36 +387,28 @@ async function listEvaluationNotificationRecipients(
     const athlete = (row as any)?.athlete;
     if (!athlete) continue;
 
-    const userId = typeof athlete.user_id === "string" && athlete.user_id.trim()
-      ? athlete.user_id.trim()
-      : null;
+    const userId = trimOrNull(athlete.user_id);
+
     if (!userId || seenUserIds.has(userId)) continue;
     seenUserIds.add(userId);
 
-    const full_name = typeof athlete.full_name === "string" && athlete.full_name.trim()
-      ? athlete.full_name.trim()
-      : null;
+    const fullName = trimOrNull(athlete.full_name);
 
-    recipients.push({ user_id: userId, full_name: full_name });
+    recipients.push({ user_id: userId, full_name: fullName });
 
-    const athleteResult = await getAthleteById(athlete.id, athlete.org_id);
+    if (row.athlete.athlete_guardians) {
 
-    if (!athleteResult.error && athleteResult.data && athleteResult.data.parent) {
-      const parent = athleteResult.data.parent;
-      if (parent.email && parent.full_name) {
-        const { data: parentProfileRow } = await client
-          .from("profiles")
-          .select("user_id, full_name")
-          .eq("email", parent.email)
-          .maybeSingle();
-
-        if (parentProfileRow) {
-          recipients.push({ user_id: parentProfileRow.user_id, full_name: full_name });
+      for (const guardian of row.athlete.athlete_guardians) {
+        const parent = guardian?.guardian ?? null;
+        if (parent && parent.user_id) {
+          recipients.push({
+            user_id: parent.user_id,
+            full_name: fullName,
+          });
         }
       }
     }
   }
-
   return recipients;
 }
 

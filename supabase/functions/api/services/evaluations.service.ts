@@ -4,6 +4,7 @@ import { EvaluationDetailDto, type EvaluationMatrixUpdateDto, toEvaluationDetail
 import { INVITE_REDIRECT_URL } from "../config/env.ts";
 import type { EvaluationReportEmailInput } from "./email.service.ts";
 import { getAthleteById } from "./athletes.service.ts";
+import { trimOrNull } from "../utils/entities.ts";
 
 type SubmitEvaluationResult = { ok: true; data: { id: string; status: string } } | { ok: false; error: unknown };
 
@@ -1631,10 +1632,8 @@ export async function getEvaluationReportContext(evaluationId: string, org_id: s
     throw new Error("Evaluation not found");
   }
 
-  const coachName =
-    typeof data?.coach?.full_name === "string" && data.coach.full_name.trim()
-      ? data.coach.full_name.trim()
-      : "Administrator";
+  const coachName = data?.coach == null ? "Administrator" :
+    trimOrNull(data.coach.full_name) ?? "your coach";
 
   const evaluationTitle =
     typeof data?.template?.name === "string" && data.template.name.trim() ? data.template.name.trim() : "Evaluation";
