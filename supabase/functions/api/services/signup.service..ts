@@ -1,7 +1,7 @@
 import { notifyAthleteJoined, notifyCoachJoined } from "./notification.service.ts";
 import { sbAdmin } from "./supabase.ts";
 
-export async function rpcRegisterAthlete(args: Record<string, unknown>) {
+export async function registerAthlete(args: Record<string, unknown>) {
   const client = sbAdmin;
   if (!client) {
     throw new Error("Supabase client not initialized");
@@ -57,7 +57,7 @@ export async function rpcRegisterAthlete(args: Record<string, unknown>) {
   return result;
 }
 
-export async function rpcRegisterCoach(args: Record<string, unknown>) {
+export async function registerCoach(args: Record<string, unknown>) {
 
   const client = sbAdmin;
   if (!client) {
