@@ -14,7 +14,7 @@ export function createScorecardsRouter(): Router {
   const router = new Router();
 
   // POST /api/scorecard
-  router.add("POST", "", handleScorecardsCreateTemplate, [orgRoleGuardFromBody("org_id", ["coach"])]);
+  router.add("POST", "", handleScorecardsCreateTemplate, [orgRoleGuardFromBody("org_id", ["admin"])]);
 
   // GET /api/scorecard/list
   router.add("GET", "list", handleScorecardsList, [orgRoleGuardFromQuery("org_id", ["coach"])]);
@@ -27,8 +27,8 @@ export function createScorecardsRouter(): Router {
   router.add("GET", ":id", handleScorecardById, [orgRoleGuardFromQuery("org_id", ["coach"])]);
 
   // PATCH /api/scorecard/:id
-  router.add("PATCH", ":id", handleScorecardUpdate, [orgRoleGuardFromBody("org_id", ["coach"])]);
-  router.add("DELETE", ":id", handleScorecardDelete, [orgRoleGuardFromQuery("org_id", ["coach"])]);
+  router.add("PATCH", ":id", handleScorecardUpdate, [orgRoleGuardFromBody("org_id", ["admin"])]);
+  router.add("DELETE", ":id", handleScorecardDelete, [orgRoleGuardFromQuery("org_id", ["admin"])]);
 
   return router;
 }

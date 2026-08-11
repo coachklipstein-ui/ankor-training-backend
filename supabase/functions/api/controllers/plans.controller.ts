@@ -6,26 +6,12 @@ import {
   PlanListFilterSchema,
   UpdatePlanSchema,
 } from "../dtos/plans.dto.ts";
-import {
-  createPlan,
-  getPlanById,
-  invitePlanMembers,
-  listInvitedPlans,
-  listPlansByType,
-  updatePlan,
-} from "../services/plans.service.ts";
-import {
-  badRequest,
-  created,
-  internalError,
-  json,
-  methodNotAllowed,
-  notFound,
-  forbidden,
-  unauthorized,
-} from "../utils/http.ts";
-import type { RequestContext } from "../routes/router.ts";
+import { createPlan, getPlanById, invitePlanMembers, listInvitedPlans, listPlansByType, updatePlan } from "../services/plans.service.ts";
+import { badRequest, created, internalError, json, methodNotAllowed, notFound, forbidden, unauthorized } from "../utils/http.ts";
+import type { RequestContext, RouteParams } from "../routes/router.ts";
+import { type OrgRole } from "../utils/auth.ts";
 import { RE_UUID } from "../utils/uuid.ts";
+import { isPlatformAdminRole } from "../utils/roles.ts";
 
 function qp(url: URL, key: string): string | undefined {
   const value = url.searchParams.get(key);
@@ -33,7 +19,12 @@ function qp(url: URL, key: string): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-export async function listPlansController(req: Request): Promise<Response> {
+export async function listPlansController(
+  req: Request,
+  _origin: string | null = null,
+  _params?: RouteParams,
+  ctx?: RequestContext,
+): Promise<Response> {
   if (req.method !== "GET") {
     return methodNotAllowed(["GET"]);
   }
@@ -51,6 +42,13 @@ export async function listPlansController(req: Request): Promise<Response> {
   if (!parsed.success) {
     const message = parsed.error.issues.map((issue) => issue.message).join("; ");
     return badRequest(message);
+  }
+
+  if (parsed.data.type === "org") {
+    const role = ctx?.org_role as OrgRole | undefined;
+    if (!role || !isPlatformAdminRole(role)) {
+      return forbidden("Only organization admins can list all org plans");
+    }
   }
 
   const { data, count, error } = await listPlansByType(parsed.data);

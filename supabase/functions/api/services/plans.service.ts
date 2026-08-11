@@ -89,19 +89,23 @@ export async function listPlansByType(
   const { type, user_id, org_id, limit, offset } = filters;
   const rangeTo = offset + (limit - 1);
 
-  console.log("user_id:", user_id, "type:", type);
-
   let query = client
     .from("practice_plans")
     .select(PLAN_SELECT, { count: "exact" })
     .range(offset, rangeTo)
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .eq("org_id", org_id);
 
-  query = query.eq("type", type);
-  query = query.eq("org_id", org_id);
-  if (type !== "prebuild") {
-    query = query.eq("owner_user_id", user_id);
+  if (type === "org") {
+    // Org-wide admin list: all custom plans in the organization (any owner).
+    query = query.eq("type", "custom");
+  } else {
+    query = query.eq("type", type);
+    if (type !== "prebuild") {
+      query = query.eq("owner_user_id", user_id);
+    }
   }
+
   const { data, error, count } = await query;
   if (error) return { data: [], count: 0, error };
 

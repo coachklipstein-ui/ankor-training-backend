@@ -237,7 +237,7 @@ export async function handleSkillMediaBatchUpload(
     return json({ ok: false, error: "Unauthorized" }, origin, 401);
   }
 
-  const access = await requireOrgRole(ctx.user.id, parsed.data.org_id, ["coach"]);
+  const access = await requireOrgRole(ctx.user.id, parsed.data.org_id, ["admin"]);
   if ("response" in access) return access.response;
 
   ctx.org_id = parsed.data.org_id;

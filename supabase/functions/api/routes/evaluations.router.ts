@@ -53,7 +53,7 @@ export function createEvaluationsRouter(): Router {
     orgRoleGuardFromQuery("org_id", ["coach", "athlete", "parent"]),
   ]);
   router.add("POST", ":id/workout-progress", handleIncrementWorkoutProgress, [
-    orgRoleGuardFromQuery("org_id", ["coach", "athlete", "parent"]),
+    orgRoleGuardFromQuery("org_id", ["coach", "athlete"]),
   ]);
   router.add("GET", "eval/:id", handleEvaluationById, [orgRoleGuardFromQuery("org_id", ["coach"])]);
   router.add("DELETE", "eval/:id", handleDeleteEvaluation, [orgRoleGuardFromQuery("org_id", ["coach"])]);

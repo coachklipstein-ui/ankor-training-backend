@@ -16,16 +16,18 @@ export function createSkillDrillMapRouter(): Router {
     orgRoleGuardFromQuery("org_id", ["coach", "athlete", "parent"]),
   ]);
 
-  router.add("POST", "bulk", bulkSkillDrillMapsController, [orgRoleGuardFromBody("org_id", ["coach"])]);
+  router.add("POST", "bulk", bulkSkillDrillMapsController, [orgRoleGuardFromBody("org_id", ["admin"])]);
 
   router.add("GET", ":skill_id", listSkillDrillMapsBySkillController);
 
-  router.add("POST", "", createSkillDrillMapsController, [orgRoleGuardFromBody("org_id", ["coach"])]);
+  router.add("POST", "", createSkillDrillMapsController, [orgRoleGuardFromBody("org_id", ["admin"])]);
 
-  router.add("PATCH", ":skill_id/:drill_id", updateSkillDrillMapController);
+  router.add("PATCH", ":skill_id/:drill_id", updateSkillDrillMapController, [
+    orgRoleGuardFromQuery("org_id", ["admin"]),
+  ]);
 
   router.add("DELETE", ":skill_id/:drill_id", deleteSkillDrillMapController, [
-    orgRoleGuardFromQuery("org_id", ["coach"]),
+    orgRoleGuardFromQuery("org_id", ["admin"]),
   ]);
 
   return router;
