@@ -28,14 +28,16 @@ export type NotificationPayloadBase = {
   link: string;
 };
 
+export type EvaluationCompletedNotificationInput = {
+  type: "evaluation_completed";
+  org_id: string;
+  user_id: string;
+  evaluation_id: string;
+  payload: NotificationPayloadBase & { topic: "evaluation_completed" };
+};
+
 export type CreateNotificationInput =
-  | {
-      type: "evaluation_completed";
-      org_id: string;
-      user_id: string;
-      evaluation_id: string;
-      payload: NotificationPayloadBase & { topic: "evaluation_completed" };
-    }
+  | EvaluationCompletedNotificationInput
   | {
       type: "athlete_joined";
       org_id: string;
@@ -270,7 +272,7 @@ export async function notifyEvaluationCompleted(
       return { data: [], error: null };
     }
 
-    const inputs: Extract<CreateNotificationInput, { type: "evaluation_completed" }>[] =
+    const inputs: EvaluationCompletedNotificationInput[] =
       recipients.map((recipient) => ({
         type: "evaluation_completed",
         org_id,
