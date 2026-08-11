@@ -7,7 +7,7 @@ export type NotificationType =
   | "evaluation_completed"
   | "athlete_joined"
   | "coach_joined"
-  | "plan_shared"
+  | "plan_shared";
 
 export type NotificationRow = {
   id: string;
@@ -20,13 +20,43 @@ export type NotificationRow = {
   read_at: string | null;
 };
 
-export type CreateNotificationInput = {
-  org_id?: string | null;
-  user_id?: string | null;
-  type: NotificationType;
-  evaluation_id?: string | null;
-  payload?: Record<string, unknown> | null;
+
+export type NotificationPayloadBase = {
+  title: string;
+  description: string;
+  topic: string;
+  link: string;
 };
+
+export type CreateNotificationInput =
+  | {
+      type: "evaluation_completed";
+      org_id: string;
+      user_id: string;
+      evaluation_id: string;
+      payload: NotificationPayloadBase & { topic: "evaluation_completed" };
+    }
+  | {
+      type: "athlete_joined";
+      org_id: string;
+      user_id: string;
+      evaluation_id?: null;
+      payload: NotificationPayloadBase & { topic: "athlete_joined" };
+    }
+  | {
+      type: "coach_joined";
+      org_id: string;
+      user_id: string;
+      evaluation_id?: null;
+      payload: NotificationPayloadBase & { topic: "coach_joined" };
+    }
+  | {
+      type: "plan_shared";
+      org_id: string;
+      user_id: string;
+      evaluation_id?: null;
+      payload: NotificationPayloadBase & { topic: "plan_shared" };
+    };
 
 export type BulkCreateNotificationInput = CreateNotificationInput[];
 
@@ -258,9 +288,10 @@ export async function notifyEvaluationCompleted(
           payload: {
             title: item.title,
             description: item.description,
-            topic: item.topic,
+            topic: "evaluation_completed",
             link: item.link,
           },
+          type: "evaluation_completed"
         });
 
         if (notifResult.error) {
@@ -273,19 +304,10 @@ export async function notifyEvaluationCompleted(
   }
 }
 
-async function notifyEvaluationCompletedInternal(params: {
-  org_id: string;
-  user_id: string;
-  evaluation_id: string;
-  payload?: Record<string, unknown>;
-}) {
-  return createNotification({
-    org_id: params.org_id,
-    user_id: params.user_id,
-    type: "evaluation_completed",
-    evaluation_id: params.evaluation_id,
-    payload: params.payload ?? null,
-  });
+async function notifyEvaluationCompletedInternal(
+  input: Extract<CreateNotificationInput, { type: "evaluation_completed" }>,
+) {
+  return createNotification(input);
 }
 
 export async function notifyAthleteJoined(params: {
