@@ -30,6 +30,9 @@ export async function registerAthlete(args: Record<string, unknown>) {
   if (teamError) {
     throw new Error(`Error fetching join code: ${teamError.message}`);
   }
+  if (!code_data?.org_id) {
+    throw new Error("Join code organization not found");
+  }
 
   const { data: athlete, error: athleteError } = await client
     .from("athletes")
@@ -40,6 +43,7 @@ export async function registerAthlete(args: Record<string, unknown>) {
     `,
     )
     .eq("user_id", args.p_user_id)
+    .eq("org_id", code_data.org_id)
     .maybeSingle();
 
   if (athleteError) {
@@ -87,6 +91,9 @@ export async function registerCoach(args: Record<string, unknown>) {
   if (teamError) {
     throw new Error(`Error fetching join code: ${teamError.message}`);
   }
+  if (!code_data?.org_id) {
+    throw new Error("Join code organization not found");
+  }
 
   const { data: coach, error: coachError } = await client
     .from("coaches")
@@ -97,6 +104,7 @@ export async function registerCoach(args: Record<string, unknown>) {
     `,
     )
     .eq("user_id", args.p_user_id)
+    .eq("org_id", code_data.org_id)
     .maybeSingle();
 
   if (coachError) {

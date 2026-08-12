@@ -1,5 +1,6 @@
 import { sbAdmin } from "./supabase.ts";
 import { generateMagicLink, sendWelcomeEmail } from "./email.service.ts";
+import { deleteAuthUserIfCreated, ensureAuthUser } from "./auth_user.service.ts";
 import type {
   AthleteDto,
   AthleteListFilterInput,
@@ -63,34 +64,6 @@ function mapAthleteRow(row: any): AthleteDto {
         }
       : null,
   };
-}
-
-async function findUserIdByEmail(client: any, email: string): Promise<{ userId: string | null; error: unknown }> {
-  const admin = client?.auth?.admin;
-  if (!admin) {
-    return { userId: null, error: new Error("Supabase admin client not available") };
-  }
-
-  if (typeof admin.getUserByEmail === "function") {
-    const { data, error } = await admin.getUserByEmail(email);
-    if (error) return { userId: null, error };
-    return { userId: data?.user?.id ?? null, error: null };
-  }
-
-  if (typeof admin.listUsers === "function") {
-    const perPage = 200;
-    for (let page = 1; page <= 100; page += 1) {
-      const { data, error } = await admin.listUsers({ page, perPage });
-      if (error) return { userId: null, error };
-      const users = Array.isArray(data?.users) ? data.users : Array.isArray(data) ? data : [];
-      const match = users.find((user: any) => typeof user?.email === "string" && user.email.toLowerCase() === email);
-      if (match?.id) return { userId: match.id, error: null };
-      if (users.length < perPage) break;
-    }
-    return { userId: null, error: null };
-  }
-
-  return { userId: null, error: new Error("Supabase admin user lookup not supported") };
 }
 
 export async function listAthletes(
@@ -264,64 +237,46 @@ export async function createAthlete(input: CreateAthleteInput): Promise<{ data: 
     const firstName = guardianFullName.split("")[0];
     const lastName = guardianFullName.split("")[1];
 
-    const { data: created, error: createErr } = await client.auth.admin.createUser({
+    const { data: ensuredGuardian, error: ensureGuardianErr } = await ensureAuthUser({
       email: guardianEmail,
       password: input.password,
+      role: "parent",
       user_metadata: {
         first_name: firstName,
         last_name: lastName,
         full_name: guardianFullName,
         cell_number: guardianPhone,
       },
-      app_metadata: { role: "parent" },
-      email_confirm: true,
     });
 
-    if (createErr) {
-      return { data: null, error: createErr };
+    if (ensureGuardianErr || !ensuredGuardian) {
+      return { data: null, error: ensureGuardianErr ?? new Error("Failed to ensure guardian auth user") };
     }
 
-    guardianUserId = created.user?.id ?? null;
-    if (!guardianUserId) {
-      return { data: null, error: new Error("User was not returned by Supabase") };
-    }
+    guardianUserId = ensuredGuardian.userId;
+    guardianUserCreated = ensuredGuardian.created;
   }
 
   //creating athlete user when parent email and athlete email are different
   if (!guardianMatchesAthlete) {
-    const email = input.email.trim().toLowerCase();
-    const { userId: existingUserId, error: userLookupError } = await findUserIdByEmail(client, email);
-    if (userLookupError) {
-      return { data: null, error: userLookupError };
-    }
-    const exists = Boolean(existingUserId);
-    //if the user does not exist then create athlete user
-    if (!exists) {
-      const { data: created, error: createErr } = await client.auth.admin.createUser({
-        email: athleteEmail,
-        password: input.password,
-        user_metadata: {
-          first_name: input.first_name,
-          last_name: input.last_name,
-          cell_number: input.cell_number ?? null,
-        },
-        app_metadata: { role: "athlete" },
-        email_confirm: true,
-      });
+    const { data: ensuredAthlete, error: ensureAthleteErr } = await ensureAuthUser({
+      email: athleteEmail,
+      password: input.password,
+      role: "athlete",
+      user_metadata: {
+        first_name: input.first_name,
+        last_name: input.last_name,
+        cell_number: input.cell_number ?? null,
+      },
+    });
 
-      if (createErr) {
-        return { data: null, error: createErr };
-      }
+    if (ensureAthleteErr || !ensuredAthlete) {
+      await deleteAuthUserIfCreated(guardianUserId, guardianUserCreated);
+      return { data: null, error: ensureAthleteErr ?? new Error("Failed to ensure athlete auth user") };
+    }
 
-      userId = created.user?.id ?? null;
-      if (!userId) {
-        return { data: null, error: new Error("User was not returned by Supabase") };
-      }
-      athleteUserCreated = true;
-    }
-    if (existingUserId) {
-      userId = existingUserId;
-    }
+    userId = ensuredAthlete.userId;
+    athleteUserCreated = ensuredAthlete.created;
   }
 
   if (guardianMatchesAthlete) {
@@ -354,12 +309,8 @@ export async function createAthlete(input: CreateAthleteInput): Promise<{ data: 
   });
 
   if (txErr) {
-    if (athleteUserCreated && userId) {
-      await client.auth.admin.deleteUser(userId).catch(() => {});
-    }
-    if (guardianUserCreated && guardianUserId) {
-      await client.auth.admin.deleteUser(guardianUserId).catch(() => {});
-    }
+    await deleteAuthUserIfCreated(userId, athleteUserCreated);
+    await deleteAuthUserIfCreated(guardianUserId, guardianUserCreated);
     return { data: null, error: txErr };
   }
 
@@ -371,12 +322,8 @@ export async function createAthlete(input: CreateAthleteInput): Promise<{ data: 
         : ((txData as any)?.athlete_id ?? null);
 
   if (!athleteId) {
-    if (athleteUserCreated && userId) {
-      await client.auth.admin.deleteUser(userId).catch(() => {});
-    }
-    if (guardianUserCreated && guardianUserId) {
-      await client.auth.admin.deleteUser(guardianUserId).catch(() => {});
-    }
+    await deleteAuthUserIfCreated(userId, athleteUserCreated);
+    await deleteAuthUserIfCreated(guardianUserId, guardianUserCreated);
     return { data: null, error: new Error("Failed to create athlete") };
   }
 
@@ -392,17 +339,13 @@ export async function createAthlete(input: CreateAthleteInput): Promise<{ data: 
       } catch {
         // ignore cleanup failure
       }
-      if (athleteUserCreated && userId) {
-        await client.auth.admin.deleteUser(userId).catch(() => {});
-      }
-      if (guardianUserCreated && guardianUserId) {
-        await client.auth.admin.deleteUser(guardianUserId).catch(() => {});
-        if (guardianEmail) {
-          try {
-            await client.from("guardian_contacts").delete().eq("org_id", input.org_id).ilike("email", guardianEmail);
-          } catch {
-            // ignore cleanup failure
-          }
+      await deleteAuthUserIfCreated(userId, athleteUserCreated);
+      await deleteAuthUserIfCreated(guardianUserId, guardianUserCreated);
+      if (guardianUserCreated && guardianEmail) {
+        try {
+          await client.from("guardian_contacts").delete().eq("org_id", input.org_id).ilike("email", guardianEmail);
+        } catch {
+          // ignore cleanup failure
         }
       }
       return { data: null, error: positionsError };
@@ -416,17 +359,13 @@ export async function createAthlete(input: CreateAthleteInput): Promise<{ data: 
     } catch {
       // ignore cleanup failure
     }
-    if (athleteUserCreated && userId) {
-      await client.auth.admin.deleteUser(userId).catch(() => {});
-    }
-    if (guardianUserCreated && guardianUserId) {
-      await client.auth.admin.deleteUser(guardianUserId).catch(() => {});
-      if (guardianEmail) {
-        try {
-          await client.from("guardian_contacts").delete().eq("org_id", input.org_id).ilike("email", guardianEmail);
-        } catch {
-          // ignore cleanup failure
-        }
+    await deleteAuthUserIfCreated(userId, athleteUserCreated);
+    await deleteAuthUserIfCreated(guardianUserId, guardianUserCreated);
+    if (guardianUserCreated && guardianEmail) {
+      try {
+        await client.from("guardian_contacts").delete().eq("org_id", input.org_id).ilike("email", guardianEmail);
+      } catch {
+        // ignore cleanup failure
       }
     }
     return {

@@ -74,17 +74,23 @@ const resolveEffectiveProfileRole = async (
 const resolveEntityIds = async (
   effectiveRole: string | null,
   profileUserId: string,
+  profileOrgId: string,
 ): Promise<{ coach_id: string | null; athlete_id: string | null; error: unknown }> => {
   const client = sbAdmin;
   if (!client) {
     return { coach_id: null, athlete_id: null, error: new Error("Supabase admin client not configured") };
   }
 
-  if (effectiveRole === "coach" && profileUserId) {
+  if (!profileUserId || !profileOrgId) {
+    return { coach_id: null, athlete_id: null, error: null };
+  }
+
+  if (effectiveRole === "coach") {
     const { data: coachRow, error: coachErr } = await client
       .from("coaches")
       .select("id")
       .eq("user_id", profileUserId)
+      .eq("org_id", profileOrgId)
       .maybeSingle();
 
     if (coachErr) {
@@ -94,11 +100,12 @@ const resolveEntityIds = async (
     return { coach_id: coachRow?.id ?? null, athlete_id: null, error: null };
   }
 
-  if (effectiveRole === "athlete" && profileUserId) {
+  if (effectiveRole === "athlete") {
     const { data: athleteRow, error: athleteErr } = await client
       .from("athletes")
       .select("id")
       .eq("user_id", profileUserId)
+      .eq("org_id", profileOrgId)
       .maybeSingle();
 
     if (athleteErr) {
@@ -166,7 +173,12 @@ export const resolveLoginUser = async (userId: string): Promise<ResolveLoginUser
   }
 
   const profileUserId = profileRow.id.trim();
-  const { coach_id, athlete_id, error: entityError } = await resolveEntityIds(effectiveRole, profileUserId);
+  const profileOrgId = profileRow.default_org_id?.trim() ?? "";
+  const { coach_id, athlete_id, error: entityError } = await resolveEntityIds(
+    effectiveRole,
+    profileUserId,
+    profileOrgId,
+  );
   if (entityError) {
     return {
       ok: false,
@@ -176,7 +188,6 @@ export const resolveLoginUser = async (userId: string): Promise<ResolveLoginUser
   }
 
   let orgRole: OrgRole | null = null;
-  const profileOrgId = profileRow.default_org_id?.trim() ?? "";
   if (profileOrgId && profileUserId) {
     const { role, error: orgRoleError } = await getOrgRole(profileUserId, profileOrgId, {
       role: profileRow.role,

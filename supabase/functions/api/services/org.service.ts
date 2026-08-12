@@ -57,13 +57,25 @@ export async function listOrganizations(filters: ListOrganizationsFilters): Prom
     .range(filters.offset, filters.offset + filters.limit - 1);
 
   if (!profileError && typeof profile?.role === "string" && profile.role.trim().toLowerCase() === "admin") {
-    const { data: orgIdData } = await client.from("org_memberships").
-      select("org_id")
+    const { data: membershipRows, error: membershipError } = await client
+      .from("org_memberships")
+      .select("org_id")
       .eq("user_id", filters.adminId)
-      .eq("role", "admin")
-      .maybeSingle();
+      .eq("role", "admin");
 
-    query = query.eq("id", orgIdData?.org_id);
+    if (membershipError) {
+      return { data: [], count: 0, error: membershipError };
+    }
+
+    const orgIds = (membershipRows ?? [])
+      .map((row) => (typeof row.org_id === "string" ? row.org_id.trim() : ""))
+      .filter((id) => id.length > 0);
+
+    if (orgIds.length === 0) {
+      return { data: [], count: 0, error: null };
+    }
+
+    query = query.in("id", orgIds);
   }
 
   if (filters.q) {

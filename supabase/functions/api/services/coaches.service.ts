@@ -1,5 +1,10 @@
 import { sbAdmin } from "./supabase.ts";
 import { generateMagicLink, sendWelcomeEmail } from "./email.service.ts";
+import {
+  assertEmailNotOrgMember,
+  deleteAuthUserIfCreated,
+  ensureAuthUser,
+} from "./auth_user.service.ts";
 import type { CoachDto, CoachListFilterInput, CreateCoachInput, UpdateCoachInput } from "../dtos/coaches.dto.ts";
 
 function buildFullName(first?: string | null, last?: string | null): string | null {
@@ -99,6 +104,29 @@ export async function getCoachById(
   return { data: data ? mapCoachRow(data) : null, error: null };
 }
 
+const assertCoachEmailAvailable = async (
+  orgId: string,
+  email: string,
+): Promise<{ error: unknown }> => {
+  const client = sbAdmin;
+  if (!client) {
+    return { error: new Error("Supabase client not initialized") };
+  }
+
+  const { data: existingCoach, error: coachLookupError } = await client
+    .from("coaches")
+    .select("id")
+    .eq("org_id", orgId)
+    .ilike("email", email)
+    .maybeSingle();
+
+  if (coachLookupError) return { error: coachLookupError };
+  if (existingCoach?.id) {
+    return { error: new Error("coach already exists") };
+  }
+  return { error: null };
+};
+
 export async function createCoach(input: CreateCoachInput): Promise<{ data: CoachDto | null; error: unknown }> {
   const client = sbAdmin;
   if (!client) {
@@ -107,25 +135,27 @@ export async function createCoach(input: CreateCoachInput): Promise<{ data: Coac
 
   const full_name = input.full_name?.trim() || null;
 
-  const { data: created, error: createErr } = await client.auth.admin.createUser({
+  const { error: coachExistsError } = await assertCoachEmailAvailable(input.org_id, input.email);
+  if (coachExistsError) return { data: null, error: coachExistsError };
+
+  const { error: memberError } = await assertEmailNotOrgMember(input.org_id, input.email);
+  if (memberError) return { data: null, error: memberError };
+
+  const { data: ensured, error: ensureErr } = await ensureAuthUser({
     email: input.email,
     password: input.password,
+    role: "coach",
     user_metadata: {
       full_name,
       cell_number: input.cell_number ?? null,
     },
-    app_metadata: { role: "coach" },
-    email_confirm: true,
   });
 
-  if (createErr) {
-    return { data: null, error: createErr };
+  if (ensureErr || !ensured) {
+    return { data: null, error: ensureErr ?? new Error("Failed to ensure coach auth user") };
   }
 
-  const userId = created.user?.id ?? null;
-  if (!userId) {
-    return { data: null, error: new Error("User was not returned by Supabase") };
-  }
+  const { userId, created: authUserCreated } = ensured;
 
   const { data: txData, error: txErr } = await client.rpc("create_coach_tx", {
     p_user_id: userId,
@@ -139,7 +169,7 @@ export async function createCoach(input: CreateCoachInput): Promise<{ data: Coac
   });
 
   if (txErr) {
-    await client.auth.admin.deleteUser(userId).catch(() => {});
+    await deleteAuthUserIfCreated(userId, authUserCreated);
     return { data: null, error: txErr };
   }
 
@@ -148,10 +178,10 @@ export async function createCoach(input: CreateCoachInput): Promise<{ data: Coac
       ? txData
       : Array.isArray(txData)
         ? (txData[0]?.coach_id ?? null)
-        : ((txData as any)?.coach_id ?? null);
+        : ((txData as { coach_id?: string } | null)?.coach_id ?? null);
 
   if (!coachId) {
-    await client.auth.admin.deleteUser(userId).catch(() => {});
+    await deleteAuthUserIfCreated(userId, authUserCreated);
     return { data: null, error: new Error("Failed to create coach") };
   }
 
@@ -162,20 +192,22 @@ export async function createCoach(input: CreateCoachInput): Promise<{ data: Coac
     } catch {
       // ignore cleanup failure
     }
-    await client.auth.admin.deleteUser(userId).catch(() => {});
+    await deleteAuthUserIfCreated(userId, authUserCreated);
     return {
       data: null,
       error: coachResult.error ?? new Error("Failed to load created coach"),
     };
   }
 
-  try {
-    const welcomeName = coachResult.data.full_name ?? full_name ?? null;
-    const data: Record<string, unknown> = { role: "coach", user_id: userId };
-    const { actionLink } = await generateMagicLink(input.email, { data });
-    await sendWelcomeEmail(input.email, welcomeName, actionLink);
-  } catch (emailErr) {
-    console.error("[createCoach] welcome email failed", emailErr);
+  if (authUserCreated) {
+    try {
+      const welcomeName = coachResult.data.full_name ?? full_name ?? null;
+      const data: Record<string, unknown> = { role: "coach", user_id: userId };
+      const { actionLink } = await generateMagicLink(input.email, { data });
+      await sendWelcomeEmail(input.email, welcomeName, actionLink);
+    } catch (emailErr) {
+      console.error("[createCoach] welcome email failed", emailErr);
+    }
   }
 
   return coachResult;

@@ -79,11 +79,11 @@ export async function createGuardianController(
   if (error) {
     const message = error instanceof Error ? error.message : String(error);
     const lowered = message.toLowerCase();
-    if (lowered.includes("user already exists")) {
-      return badRequest("User already exists");
-    }
     if (lowered.includes("guardian already exists")) {
       return badRequest("Guardian already exists");
+    }
+    if (lowered.includes("user already a member of this organization")) {
+      return badRequest("User already a member of this organization");
     }
     if (lowered.includes("already registered") || lowered.includes("duplicate")) {
       return json(409, { ok: false, error: "Email already registered" });

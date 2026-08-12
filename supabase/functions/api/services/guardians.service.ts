@@ -1,5 +1,10 @@
 import { sbAdmin } from "./supabase.ts";
 import { generateMagicLink, sendWelcomeEmail } from "./email.service.ts";
+import {
+  assertEmailNotOrgMember,
+  deleteAuthUserIfCreated,
+  ensureAuthUser,
+} from "./auth_user.service.ts";
 import type {
   CreateGuardianInput,
   GuardianDto,
@@ -39,34 +44,6 @@ function mapGuardianRow(row: any): GuardianDto {
     country: row.country ?? null,
     athletes,
   };
-}
-
-async function findUserIdByEmail(client: any, email: string): Promise<{ userId: string | null; error: unknown }> {
-  const admin = client?.auth?.admin;
-  if (!admin) {
-    return { userId: null, error: new Error("Supabase admin client not available") };
-  }
-
-  if (typeof admin.getUserByEmail === "function") {
-    const { data, error } = await admin.getUserByEmail(email);
-    if (error) return { userId: null, error };
-    return { userId: data?.user?.id ?? null, error: null };
-  }
-
-  if (typeof admin.listUsers === "function") {
-    const perPage = 200;
-    for (let page = 1; page <= 100; page += 1) {
-      const { data, error } = await admin.listUsers({ page, perPage });
-      if (error) return { userId: null, error };
-      const users = Array.isArray(data?.users) ? data.users : Array.isArray(data) ? data : [];
-      const match = users.find((user: any) => typeof user?.email === "string" && user.email.toLowerCase() === email);
-      if (match?.id) return { userId: match.id, error: null };
-      if (users.length < perPage) break;
-    }
-    return { userId: null, error: null };
-  }
-
-  return { userId: null, error: new Error("Supabase admin user lookup not supported") };
 }
 
 export async function getGuardianById(
@@ -244,6 +221,29 @@ export async function updateGuardian(
   return await getGuardianById(guardian_id, org_id);
 }
 
+const assertGuardianEmailAvailable = async (
+  orgId: string,
+  email: string,
+): Promise<{ error: unknown }> => {
+  const client = sbAdmin;
+  if (!client) {
+    return { error: new Error("Supabase client not initialized") };
+  }
+
+  const { data: existingGuardian, error: guardianLookupError } = await client
+    .from("guardian_contacts")
+    .select("id")
+    .eq("org_id", orgId)
+    .ilike("email", email)
+    .maybeSingle();
+
+  if (guardianLookupError) return { error: guardianLookupError };
+  if (existingGuardian?.id) {
+    return { error: new Error("guardian already exists") };
+  }
+  return { error: null };
+};
+
 export async function createGuardian(
   input: CreateGuardianInput,
 ): Promise<{ data: GuardianDto | null; error: unknown }> {
@@ -252,48 +252,27 @@ export async function createGuardian(
     return { data: null, error: new Error("Supabase client not initialized") };
   }
 
-  const email = input.email.trim().toLowerCase();
-  const { userId: existingUserId, error: userLookupError } = await findUserIdByEmail(client, email);
-  if (userLookupError) {
-    return { data: null, error: userLookupError };
-  }
-  if (existingUserId) {
-    return { data: null, error: new Error("user already exists") };
-  }
+  const { error: guardianExistsError } = await assertGuardianEmailAvailable(input.org_id, input.email);
+  if (guardianExistsError) return { data: null, error: guardianExistsError };
 
-  const { data: existingGuardian, error: guardianLookupError } = await client
-    .from("guardian_contacts")
-    .select("id")
-    .eq("org_id", input.org_id)
-    .ilike("email", input.email)
-    .maybeSingle();
+  const { error: memberError } = await assertEmailNotOrgMember(input.org_id, input.email);
+  if (memberError) return { data: null, error: memberError };
 
-  if (guardianLookupError) {
-    return { data: null, error: guardianLookupError };
-  }
-  if (existingGuardian?.id) {
-    return { data: null, error: new Error("guardian already exists") };
-  }
-
-  const { data: created, error: createErr } = await client.auth.admin.createUser({
+  const { data: ensured, error: ensureErr } = await ensureAuthUser({
     email: input.email,
     password: input.password,
+    role: "parent",
     user_metadata: {
       full_name: input.full_name,
       cell_number: input.phone ?? null,
     },
-    app_metadata: { role: "parent" },
-    email_confirm: true,
   });
 
-  if (createErr) {
-    return { data: null, error: createErr };
+  if (ensureErr || !ensured) {
+    return { data: null, error: ensureErr ?? new Error("Failed to ensure guardian auth user") };
   }
 
-  const userId = created.user?.id ?? null;
-  if (!userId) {
-    return { data: null, error: new Error("User was not returned by Supabase") };
-  }
+  const { userId, created: authUserCreated } = ensured;
 
   const { data: txData, error: txErr } = await client.rpc("create_guardian_tx", {
     p_user_id: userId,
@@ -312,7 +291,7 @@ export async function createGuardian(
   });
 
   if (txErr) {
-    await client.auth.admin.deleteUser(userId).catch(() => {});
+    await deleteAuthUserIfCreated(userId, authUserCreated);
     return { data: null, error: txErr };
   }
 
@@ -321,10 +300,10 @@ export async function createGuardian(
       ? txData
       : Array.isArray(txData)
         ? (txData[0]?.guardian_id ?? null)
-        : ((txData as any)?.guardian_id ?? null);
+        : ((txData as { guardian_id?: string } | null)?.guardian_id ?? null);
 
   if (!guardianId) {
-    await client.auth.admin.deleteUser(userId).catch(() => {});
+    await deleteAuthUserIfCreated(userId, authUserCreated);
     return { data: null, error: new Error("Failed to create guardian") };
   }
 
@@ -335,20 +314,22 @@ export async function createGuardian(
     } catch {
       // ignore cleanup failure
     }
-    await client.auth.admin.deleteUser(userId).catch(() => {});
+    await deleteAuthUserIfCreated(userId, authUserCreated);
     return {
       data: null,
       error: guardianResult.error ?? new Error("Failed to load created guardian"),
     };
   }
 
-  try {
-    const welcomeName = guardianResult.data.full_name ?? input.full_name ?? null;
-    const data: Record<string, unknown> = { role: "parent", user_id: userId };
-    const { actionLink } = await generateMagicLink(input.email, { data });
-    await sendWelcomeEmail(input.email, welcomeName, actionLink);
-  } catch (emailErr) {
-    console.error("[createGuardian] welcome email failed", emailErr);
+  if (authUserCreated) {
+    try {
+      const welcomeName = guardianResult.data.full_name ?? input.full_name ?? null;
+      const data: Record<string, unknown> = { role: "parent", user_id: userId };
+      const { actionLink } = await generateMagicLink(input.email, { data });
+      await sendWelcomeEmail(input.email, welcomeName, actionLink);
+    } catch (emailErr) {
+      console.error("[createGuardian] welcome email failed", emailErr);
+    }
   }
 
   return guardianResult;
