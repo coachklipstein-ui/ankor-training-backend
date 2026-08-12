@@ -1,5 +1,12 @@
 import { sbAdmin } from "./supabase.ts";
 
+export type OrganizationOwnerDto = {
+  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+};
+
 export type OrganizationDto = {
   id: string;
   name: string;
@@ -9,6 +16,11 @@ export type OrganizationDto = {
   maxBelowThresholdRatingsAllowed: number | null;
   maxWorkoutReps: number | null;
   sport_id: string | null;
+  sport_name?: string | null;
+  owner?: OrganizationOwnerDto | null;
+  teams_count?: number;
+  athletes_count?: number;
+  coaches_count?: number;
   created_at: string;
   updated_at: string;
 };
@@ -35,6 +47,22 @@ export type UpdateOrganizationInput = {
 const ORG_SELECT =
   "id, name, slug, sport_mode, program_gender, maxBelowThresholdRatingsAllowed, maxWorkoutReps, sport_id, created_at, updated_at";
 
+const ORG_LIST_SELECT = `
+  id,
+  name,
+  slug,
+  sport_mode,
+  program_gender,
+  maxBelowThresholdRatingsAllowed,
+  maxWorkoutReps,
+  sport_id,
+  sport:sports!organizations_sport_id_fkey(name),
+  org_memberships!inner(role, is_active, user_id),
+  teams(id, is_active),
+  created_at,
+  updated_at
+`;
+
 export async function listOrganizations(filters: ListOrganizationsFilters): Promise<{
   data: OrganizationDto[];
   count: number;
@@ -51,8 +79,7 @@ export async function listOrganizations(filters: ListOrganizationsFilters): Prom
 
   let query = client
     .from("organizations")
-    .select(ORG_SELECT, { count: "exact" })
-
+    .select(ORG_LIST_SELECT, { count: "exact" })
     .order("created_at", { ascending: false })
     .range(filters.offset, filters.offset + filters.limit - 1);
 
@@ -89,7 +116,97 @@ export async function listOrganizations(filters: ListOrganizationsFilters): Prom
   }
 
   const { data, count, error } = await query;
-  return { data: (data ?? []) as OrganizationDto[], count: count ?? 0, error };
+
+  if (error) {
+    return {
+      data: [],
+      count: 0,
+      error,
+    };
+  }
+
+  const ownerUserIds = [
+    ...new Set(
+      (data ?? [])
+        .flatMap(org =>
+          org.org_memberships
+            .filter(m => m.role === "owner")
+            .map(m => m.user_id)
+        )
+    ),
+  ];
+
+  let ownerProfiles: {
+    user_id: string;
+    full_name: string | null;
+    email: string | null;
+  }[] = [];
+
+  if (ownerUserIds.length > 0) {
+    const { data, error } = await client
+      .from("profiles")
+      .select("user_id, full_name, email")
+      .in("user_id", ownerUserIds);
+
+    if (error) {
+      return {
+        data: [],
+        count: 0,
+        error,
+      };
+    }
+
+    ownerProfiles = data ?? [];
+  }
+
+
+  const profilesByUserId = new Map(
+    ownerProfiles.map(profile => [profile.user_id, profile])
+  );
+  const organizations = (data ?? []).map(org => {
+    const ownerMembership = org.org_memberships.find(
+      m => m.role === "owner"
+    );
+
+    const owner = ownerMembership
+      ? profilesByUserId.get(ownerMembership.user_id) ?? null
+      : null;
+
+    return {
+      ...org,
+      owner,
+      coachCount: org.org_memberships.filter(
+        m => m.role === "coach" && m.is_active
+      ).length,
+      athleteCount: org.org_memberships.filter(
+        m => m.role === "athlete" && m.is_active
+      ).length,
+      teamCount: org.teams.filter(
+        t => t.is_active
+      ).length,
+    };
+  });
+
+  const items: OrganizationDto[] = organizations.map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    sport_mode: row.sport_mode ?? null,
+    program_gender: row.program_gender,
+    maxBelowThresholdRatingsAllowed:
+      row.maxBelowThresholdRatingsAllowed ?? null,
+    maxWorkoutReps: row.maxWorkoutReps ?? null,
+    sport_id: row.sport_id ?? null,
+    sport_name: row.sport?.name ?? null,
+    owner: row.owner ?? null,
+    teams_count: row.teamCount ?? 0,
+    athletes_count: row.athleteCount ?? 0,
+    coaches_count: row.coachCount ?? 0,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }));
+
+  return { data: items, count: count ?? 0, error: null };
 }
 
 export async function getOrganizationById(id: string): Promise<{ data: OrganizationDto | null; error: unknown }> {
