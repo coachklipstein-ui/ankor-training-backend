@@ -43,6 +43,31 @@ export type BulkEvaluationReportResult = {
   failed: BulkEvaluationReportFailure[];
 };
 
+export type PlanSharedEmailInput = {
+  to: string;
+  recipientName?: string | null;
+  hostName?: string | null;
+  planName?: string | null;
+  planLink?: string | null;
+  appName?: string | null;
+  subject?: string;
+};
+
+export type BulkPlanSharedOptions = {
+  subject?: string;
+  appName?: string;
+};
+
+export type BulkPlanSharedFailure = {
+  to: string;
+  error: string;
+};
+
+export type BulkPlanSharedResult = {
+  sent: number;
+  failed: BulkPlanSharedFailure[];
+};
+
 function requireValue(value: string, name: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -324,6 +349,141 @@ export async function sendBulkEvaluationReportEmails(
         const { to, from, subject, ...templateData } = payload;
         const html = buildEvaluationReportEmailHtml(templateData);
         const text = buildEvaluationReportEmailText(templateData);
+
+        const result = await sendEmail({ to, from, subject, html, text });
+        if (!result.ok) {
+          return { ok: false as const, to, error: result.error };
+        }
+        return { ok: true as const, to };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { ok: false as const, to: toCandidate || "(unknown)", error: message };
+      }
+    }),
+  );
+
+  const failed = results
+    .filter((result) => !result.ok)
+    .map((result) => ({
+      to: result.to,
+      error: result.error,
+    }));
+
+  return {
+    sent: results.length - failed.length,
+    failed,
+  };
+}
+
+type NormalizedPlanSharedPayload = {
+  to: string;
+  from: string;
+  subject: string;
+  recipientName: string;
+  hostName: string;
+  planName: string;
+  planLink: string;
+  appName: string;
+};
+
+function readPlanSharedValue(item: PlanSharedEmailInput, key: keyof PlanSharedEmailInput): string {
+  const value = item[key];
+  if (typeof value === "string") return value.trim();
+  return "";
+}
+
+function normalizePlanSharedPayload(
+  item: PlanSharedEmailInput,
+  defaults: { from: string; subject: string; appName: string },
+): NormalizedPlanSharedPayload {
+  const to = requireValue(typeof item?.to === "string" ? item.to : "", "to");
+  const recipientNameRaw = readPlanSharedValue(item, "recipientName");
+  const recipientName = recipientNameRaw || "there";
+  const hostName = requireValue(readPlanSharedValue(item, "hostName"), "hostName");
+  const planName = requireValue(readPlanSharedValue(item, "planName"), "planName");
+  const planLink = requireValue(readPlanSharedValue(item, "planLink"), "planLink");
+  const appName = requireValue(readPlanSharedValue(item, "appName") || defaults.appName, "appName");
+  const from = requireValue(defaults.from, "EMAIL_FROM");
+  const subjectRaw = typeof item.subject === "string" ? item.subject.trim() : "";
+  const subject = subjectRaw || defaults.subject;
+
+  return {
+    to,
+    from,
+    subject,
+    recipientName,
+    hostName,
+    planName,
+    planLink,
+    appName,
+  };
+}
+
+function buildPlanSharedEmailHtml(
+  payload: Omit<NormalizedPlanSharedPayload, "to" | "from" | "subject">,
+): string {
+  const safeRecipientName = escapeHtml(payload.recipientName);
+  const safeHostName = escapeHtml(payload.hostName);
+  const safePlanName = escapeHtml(payload.planName);
+  const safePlanLink = escapeHtml(payload.planLink);
+  const safeAppName = escapeHtml(payload.appName);
+
+  return `
+    <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;">
+      <p>Hi ${safeRecipientName},</p>
+      <p>
+        ${safeHostName} shared the practice plan "<strong>${safePlanName}</strong>" with you
+        in your ${safeAppName} account.
+      </p>
+      <p>
+        You can open the plan here:<br/>
+        <a href="${safePlanLink}">${safePlanLink}</a>
+      </p>
+      <p>Regards,<br/>${safeAppName} Support</p>
+    </div>
+  `;
+}
+
+function buildPlanSharedEmailText(
+  payload: Omit<NormalizedPlanSharedPayload, "to" | "from" | "subject">,
+): string {
+  return `Hi ${payload.recipientName},
+
+${payload.hostName} shared the practice plan "${payload.planName}" with you in your ${payload.appName} account.
+
+You can open the plan here:
+${payload.planLink}
+
+Regards,
+${payload.appName} Support`;
+}
+
+export async function sendBulkPlanSharedEmails(
+  items: PlanSharedEmailInput[],
+  options: BulkPlanSharedOptions = {},
+): Promise<BulkPlanSharedResult> {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { sent: 0, failed: [] };
+  }
+
+  const defaultFrom = resolveFromAddress();
+  const defaultSubject =
+    (options.subject ?? "You've been invited to a practice plan").trim() ||
+    "You've been invited to a practice plan";
+  const defaultAppName = (options.appName ?? "ANKOR").trim() || "ANKOR";
+
+  const results = await Promise.all(
+    items.map(async (item) => {
+      const toCandidate = typeof item?.to === "string" ? item.to.trim() : "";
+      try {
+        const payload = normalizePlanSharedPayload(item, {
+          from: defaultFrom,
+          subject: defaultSubject,
+          appName: defaultAppName,
+        });
+        const { to, from, subject, ...templateData } = payload;
+        const html = buildPlanSharedEmailHtml(templateData);
+        const text = buildPlanSharedEmailText(templateData);
 
         const result = await sendEmail({ to, from, subject, html, text });
         if (!result.ok) {

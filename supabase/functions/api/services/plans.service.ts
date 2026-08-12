@@ -1,5 +1,4 @@
-import { sbAdmin } from "./supabase.ts";
-import { createNotification, notifyPlanShared } from "./notification.service.ts";
+import { INVITE_REDIRECT_URL } from "../config/env.ts";
 import type {
   CreatePlanInput,
   InvitedPlanDto,
@@ -12,7 +11,45 @@ import type {
   PlanItemInput,
   UpdatePlanInput,
 } from "../dtos/plans.dto.ts";
+import { sendBulkPlanSharedEmails, type PlanSharedEmailInput } from "./email.service.ts";
+import { notifyPlanShared } from "./notification.service.ts";
+import { sbAdmin } from "./supabase.ts";
 import { getManagedUser } from "./users.service.ts";
+
+export type PlanInviteEmailFailure = {
+  user_id: string;
+  email: string;
+  error: string;
+};
+
+export type InvitePlanMembersResult = {
+  invited_user_ids: string[];
+  skipped_user_ids: string[];
+  email_sent_count: number;
+  email_failed: PlanInviteEmailFailure[];
+};
+
+/** Relative app path for a practice plan (safe for in-app RouterLink). */
+export function buildPlanLink(planId: string): string {
+  return `/practice-plans/${planId}`;
+}
+
+function toAbsolutePlanLink(relativePath: string): string {
+  const base = (INVITE_REDIRECT_URL ?? "").trim().replace(/\/+$/g, "");
+  return base ? `${base}${relativePath}` : relativePath;
+}
+
+function emptyInviteEmailResult(
+  invited_user_ids: string[],
+  skipped_user_ids: string[],
+): InvitePlanMembersResult {
+  return {
+    invited_user_ids,
+    skipped_user_ids,
+    email_sent_count: 0,
+    email_failed: [],
+  };
+}
 
 const PLAN_SELECT =
   "id, org_id, owner_user_id, name, description, visibility, status, tags, estimated_minutes, created_at, updated_at";
@@ -155,7 +192,7 @@ export async function invitePlanMembers(
   org_id: string,
   input: InvitePlanMembersInput,
 ): Promise<{
-  data: { invited_user_ids: string[]; skipped_user_ids: string[] } | null;
+  data: InvitePlanMembersResult | null;
   error: unknown;
 }> {
   const client = sbAdmin;
@@ -230,7 +267,7 @@ export async function invitePlanMembers(
   const skipped = userIds.filter((id) => existingSet.has(id));
 
   if (toInvite.length === 0) {
-    return { data: { invited_user_ids: [], skipped_user_ids: skipped }, error: null };
+    return { data: emptyInviteEmailResult([], skipped), error: null };
   }
 
   const invitedBy = input.added_by ?? planRow.owner_user_id ?? null;
@@ -308,20 +345,76 @@ export async function invitePlanMembers(
 
   if (insertError) return { data: null, error: insertError };
 
-  const planName = typeof planRow.name === "string" && planRow.name.trim() ? planRow.name.trim() : "Practice Plan";
-  const {data} = await getManagedUser(invitedBy, orgId);
-  for (const userId of toInvite) {
-    await notifyPlanShared({
-      org_id: orgId,
-      user_id: userId,
-      planName: planName,
-      hostName: data?.full_name ?? "Administrator",
-      plan_id: plan_id,
+  const planName =
+    typeof planRow.name === "string" && planRow.name.trim() ? planRow.name.trim() : "Practice Plan";
+  const { data: hostUser } = await getManagedUser(invitedBy, orgId);
+  const hostName = hostUser?.full_name?.trim() || "Administrator";
+  const planLink = toAbsolutePlanLink(buildPlanLink(plan_id));
+
+  try {
+    await Promise.all(
+      toInvite.map((userId) =>
+        notifyPlanShared({
+          org_id: orgId,
+          user_id: userId,
+          planName,
+          hostName,
+          plan_id,
+        }),
+      ),
+    );
+  } catch (notifErr) {
+    console.error("[invitePlanMembers] notification error", notifErr);
+  }
+
+  const emailItems: PlanSharedEmailInput[] = toInvite.map((user_id) => ({
+    to: emailByUserId.get(user_id) ?? "",
+    hostName,
+    planName,
+    planLink,
+  }));
+
+  let email_sent_count = 0;
+  let email_failed: PlanInviteEmailFailure[] = [];
+
+  try {
+    const emailResult = await sendBulkPlanSharedEmails(emailItems);
+    email_sent_count = emailResult.sent;
+
+    const userIdByEmail = new Map(
+      toInvite.map((user_id) => [emailByUserId.get(user_id)?.toLowerCase() ?? "", user_id]),
+    );
+
+    email_failed = emailResult.failed.map((failure) => {
+      const email = failure.to;
+      const user_id = userIdByEmail.get(email.toLowerCase()) ?? "";
+      return {
+        user_id,
+        email,
+        error: failure.error,
+      };
     });
+
+    if (email_failed.length > 0) {
+      console.error("[invitePlanMembers] email send failures", email_failed);
+    }
+  } catch (emailErr) {
+    console.error("[invitePlanMembers] email send error", emailErr);
+    const message = emailErr instanceof Error ? emailErr.message : String(emailErr);
+    email_failed = toInvite.map((user_id) => ({
+      user_id,
+      email: emailByUserId.get(user_id) ?? "",
+      error: message,
+    }));
   }
 
   return {
-    data: { invited_user_ids: toInvite, skipped_user_ids: skipped },
+    data: {
+      invited_user_ids: toInvite,
+      skipped_user_ids: skipped,
+      email_sent_count,
+      email_failed,
+    },
     error: null,
   };
 }

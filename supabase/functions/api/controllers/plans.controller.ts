@@ -144,6 +144,8 @@ export async function invitePlanMembersController(
     plan_id,
     invited_user_ids: data?.invited_user_ids ?? [],
     skipped_user_ids: data?.skipped_user_ids ?? [],
+    email_sent_count: data?.email_sent_count ?? 0,
+    email_failed: data?.email_failed ?? [],
   });
 }
 

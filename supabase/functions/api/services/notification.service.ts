@@ -336,7 +336,7 @@ export async function notifyPlanShared(params: {
     type: "plan_shared",
     payload: {
       title: "You've been invited to a practice plan",
-      description: `${params.hostName} shared the practice plan "${params.planName}" with you.".`,
+      description: `${params.hostName} shared the practice plan "${params.planName}" with you.`,
       topic: "plan_shared",
       link: `/practice-plans/${params.plan_id}`,
     },
