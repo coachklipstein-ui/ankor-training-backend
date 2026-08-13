@@ -410,7 +410,8 @@ async function listEvaluationNotificationRecipients(
       for (const guardian of row.athlete.athlete_guardians) {
         const parent = guardian?.guardian ?? null;
         const parentUserId = normalizeString(parent?.user_id);
-        if (parentUserId) {
+        if (parentUserId && !seenUserIds.has(parentUserId)) {
+          seenUserIds.add(parentUserId);
           recipients.push({
             user_id: parentUserId,
             athleteId,
@@ -424,7 +425,8 @@ async function listEvaluationNotificationRecipients(
     if (orgAdmins) {
       for (const admin of orgAdmins) {
         const adminUserId = normalizeString(admin.user_id);
-        if (!adminUserId) continue;
+        if (!adminUserId || seenUserIds.has(adminUserId)) continue;
+        seenUserIds.add(adminUserId);
         recipients.push({
           user_id: adminUserId,
           athleteId,
