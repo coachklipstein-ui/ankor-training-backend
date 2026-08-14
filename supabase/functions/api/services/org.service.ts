@@ -83,12 +83,14 @@ export async function listOrganizations(filters: ListOrganizationsFilters): Prom
     .order("created_at", { ascending: false })
     .range(filters.offset, filters.offset + filters.limit - 1);
 
-  if (!profileError && typeof profile?.role === "string" && profile.role.trim().toLowerCase() === "admin") {
+  const profileRole = !profileError && typeof profile?.role === "string" ? profile.role.trim().toLowerCase() : "";
+
+  if (profileRole !== "sys-admin") {
     const { data: membershipRows, error: membershipError } = await client
       .from("org_memberships")
       .select("org_id")
       .eq("user_id", filters.adminId)
-      .eq("role", "admin");
+      .in("role", ["owner", "admin"]);
 
     if (membershipError) {
       return { data: [], count: 0, error: membershipError };
